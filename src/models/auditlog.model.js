@@ -5,8 +5,7 @@ const auditLogSchema = new mongoose.Schema(
     // Who performed the action
     performedBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true
+      ref: "User"
     },
 
     // What action happened
@@ -22,7 +21,11 @@ const auditLogSchema = new mongoose.Schema(
         "APPROVE",
         "REJECT",
         "PUBLISH",
-        "ARCHIVE"
+        "ARCHIVE",
+        "EMAIL_FAILED",
+        "EMAIL_SENT",
+        "ACCOUNT_CREATION_FAILED",
+        "UNAUTHORIZED_CREATE_ATTEMPT"
       ]
     },
 
@@ -44,7 +47,6 @@ const auditLogSchema = new mongoose.Schema(
     // ID of affected document
     targetId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref:"User",
       required: true
     },
 
@@ -88,4 +90,5 @@ const auditLogSchema = new mongoose.Schema(
   }
 );
 
-module.exports = mongoose.model("AuditLog", auditLogSchema);
+const auditLogModel = mongoose.model("AuditLog", auditLogSchema);
+module.exports = auditLogModel

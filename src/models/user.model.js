@@ -20,6 +20,20 @@ const universityAccountSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const academicAssignmentSchema =
+  new mongoose.Schema({
+    programId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Program",
+      required: true
+    },
+
+    specializationId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Specialization"
+    }
+  }, { _id: false });
+
 const userSchema = new mongoose.Schema(
   {
     // Basic Information
@@ -60,6 +74,11 @@ const userSchema = new mongoose.Schema(
     },
 
     // Academic Mapping
+
+    academicAssignments: {
+      type:[academicAssignmentSchema],
+      default:[]
+    },
     schoolId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "School",
@@ -68,15 +87,6 @@ const userSchema = new mongoose.Schema(
       }
     },
 
-    programId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Program",
-    },
-
-    specializationId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Specialization",
-    },
 
     // Roles
     roles: {
@@ -174,4 +184,6 @@ userSchema.virtual("fullName").get(function () {
 userSchema.set("toJSON", { virtuals: true });
 userSchema.set("toObject", { virtuals: true });
 
-module.exports = mongoose.model("User", userSchema);
+const userModel = mongoose.model("User", userSchema);
+
+module.exports = userModel;
