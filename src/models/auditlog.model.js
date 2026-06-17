@@ -27,7 +27,9 @@ const auditLogSchema = new mongoose.Schema(
         "ACCOUNT_CREATION_FAILED",
         "UNAUTHORIZED_CREATE_ATTEMPT",
         "PROGRAM_CREATION_FAILED",
-        "SPECIALIZATION_CREATION_FAILED"
+        "SPECIALIZATION_CREATION_FAILED",
+        "SCHOOL_CREATION_FAILED",
+        "SUBJECT_CREATION_FAILED"
         
       ]
     },

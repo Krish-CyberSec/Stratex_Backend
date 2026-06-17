@@ -32,6 +32,10 @@ const academicAssignmentSchema =
       type: mongoose.Schema.Types.ObjectId,
       ref: "Specialization"
     },
+    semesterId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Semester"
+    },
 
     assignedSubjects: [
       {
@@ -96,7 +100,10 @@ const userSchema = new mongoose.Schema(
       }
     },
 
-
+    currentSemester: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Semester"
+    },
     // Roles
     roles: {
       type: [String],
@@ -105,7 +112,7 @@ const userSchema = new mongoose.Schema(
         "faculty",
         "coordinator",
         "schoolAdmin",
-        "admin",
+        "examCell",
         "superAdmin",
       ],
       required: true,
@@ -120,6 +127,10 @@ const userSchema = new mongoose.Schema(
       type: String,
       enum: ["active", "inactive", "suspended"],
       default: "inactive",
+    },
+    statusUpdatedAt: {
+      type: Date,
+      default: Date.now
     },
 
     // Authentication
@@ -192,6 +203,34 @@ userSchema.virtual("fullName").get(function () {
 // Include virtuals in JSON responses
 userSchema.set("toJSON", { virtuals: true });
 userSchema.set("toObject", { virtuals: true });
+
+
+
+userSchema.index({ schoolId: 1 });
+
+userSchema.index({ roles: 1 });
+
+userSchema.index({
+  "academicAssignments.programId": 1
+});
+
+userSchema.index({
+  "academicAssignments.specializationId": 1
+});
+
+userSchema.index({
+  "academicAssignments.semesterId": 1
+});
+
+userSchema.index({
+  currentSemester: 1
+});
+
+userSchema.index({
+  "academicAssignments.programId": 1,
+  "academicAssignments.specializationId": 1,
+  "academicAssignments.semesterId": 1
+});
 
 const userModel = mongoose.model("User", userSchema);
 

@@ -48,6 +48,35 @@ const createProgram = async (req, res) => {
             });
         }
 
+        const normalizedName = name.trim();
+        const normalizedDescription = description.trim();
+
+        const parsedDuration = Number(duration);
+
+        if (
+            !Number.isInteger(parsedDuration) ||
+            parsedDuration <= 0
+        ) {
+            return res.status(400).json({
+                message: "Duration must be a positive integer"
+            });
+        }
+
+        const allowedDegreeTypes = [
+            "UG",
+            "PG",
+            "Diploma",
+            "PhD"
+        ];
+
+        if (!allowedDegreeTypes.includes(degreeType)) {
+            return res.status(400).json({
+                message: "Invalid degree type"
+            });
+        }
+
+
+
 
         const allowedStatus = ["active", "inactive"];
 
@@ -58,6 +87,14 @@ const createProgram = async (req, res) => {
         }
 
         // Check school exists
+
+        const mongoose = require("mongoose");
+
+        if (!mongoose.Types.ObjectId.isValid(schoolId)) {
+            return res.status(400).json({
+                message: "Invalid school ID"
+            });
+        }
         const school = await schoolModel.findById(schoolId);
 
         if (!school) {
@@ -80,7 +117,7 @@ const createProgram = async (req, res) => {
         // Duplicate check inside same school
         const existingProgram =
             await programModel.findOne({
-                name: name.trim(),
+                name: normalizedName,
                 schoolId
             });
 
@@ -93,11 +130,11 @@ const createProgram = async (req, res) => {
 
         // Create Program
         const program = await programModel.create({
-            name: name.trim(),
+            name: normalizedName,
             schoolId,
-            description,
+            description: normalizedDescription,
             status: status || "active",
-            duration,
+            duration: parsedDuration,
             degreeType,
             createdBy: req.user._id
         });

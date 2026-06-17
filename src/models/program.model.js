@@ -1,23 +1,35 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
-const programSchema = new mongoose.Schema({
+const programSchema = new mongoose.Schema(
+{
     name: {
         type: String,
         required: true,
         trim: true
     },
+
     schoolId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "School",
         required: true
     },
-    description: String,
+
+    description: {
+        type: String,
+        trim: true
+    },
+
     status: {
         type: String,
         enum: ["active", "inactive"],
         default: "active"
     },
-    duration: String,
+
+    duration: {
+        type: Number, // years
+        required: true,
+        min: 1
+    },
 
     degreeType: {
         type: String,
@@ -26,23 +38,34 @@ const programSchema = new mongoose.Schema({
             "PG",
             "Diploma",
             "PhD"
-        ]
+        ],
+        required: true
     },
+
     createdBy: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'User'
+        ref: "User"
     },
 
     updatedBy: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'User'
+        ref: "User"
     }
 },
-    {
-        timestamps: true
+{
+    timestamps: true
+});
 
-    });
+programSchema.index({
+    schoolId: 1,
+    name: 1
+}, {
+    unique: true
+});
 
-const programModel = mongoose.model('Program', programSchema);
+const programModel = mongoose.model(
+    "Program",
+    programSchema
+);
 
 module.exports = programModel;

@@ -39,7 +39,7 @@ const registerUser = async (req, res) => {
             });
         }
 
-        const allowedStatus = ["active", "inactive","suspended"];
+        const allowedStatus = ["active", "inactive", "suspended"];
 
         if (status && !allowedStatus.includes(status)) {
             return res.status(400).json({
@@ -122,7 +122,7 @@ const registerUser = async (req, res) => {
             "faculty",
             "coordinator",
             "schoolAdmin",
-            "admin",
+            "examCell",
             "superAdmin"
         ];
 
@@ -222,15 +222,52 @@ const registerUser = async (req, res) => {
             });
         }
 
+
+        // exam cell 
+
+        if (roles.includes("examCell")) {
+
+            if (academicAssignments?.length > 0) {
+                return res.status(400).json({
+                    message:
+                        "Exam Cell users cannot have academic assignments"
+                });
+            }
+        }
+
+        // schoolAdmin
+
+        if (roles.includes("schoolAdmin")) {
+
+            if (academicAssignments?.length > 0) {
+                return res.status(400).json({
+                    message:
+                        "School Admin users cannot have academic assignments"
+                });
+            }
+        }
+
         // Student must belong to exactly one program
-        if (
-            roles.includes("student") &&
-            academicAssignments.length !== 1
-        ) {
-            return res.status(400).json({
-                message:
-                    "Student must belong to exactly one program"
-            });
+        if (roles.includes("student")) {
+
+            if (academicAssignments.length !== 1) {
+                return res.status(400).json({
+                    message: "Student must belong to exactly one academic assignment"
+                });
+            }
+
+            const assignment = academicAssignments[0];
+
+            if (
+                !assignment.programId ||
+                !assignment.specializationId ||
+                !assignment.semesterId
+            ) {
+                return res.status(400).json({
+                    message:
+                        "Student must have program, specialization and semester assigned"
+                });
+            }
         }
 
 
@@ -289,8 +326,35 @@ const registerUser = async (req, res) => {
                             "Specialization does not belong to selected program"
                     });
                 }
+
+
+
+                if (assignment.semesterId) {
+
+                    const semester = await semesterModel.findById(
+                        assignment.semesterId
+                    );
+
+                    if (!semester) {
+                        return res.status(404).json({
+                            message: "Semester not found"
+                        });
+                    }
+
+                    if (
+                        semester.specializationId.toString() !==
+                        assignment.specializationId.toString()
+                    ) {
+                        return res.status(400).json({
+                            message:
+                                "Semester does not belong to selected specialization"
+                        });
+                    }
+                }
             }
         }
+
+
 
 
 
@@ -304,9 +368,9 @@ const registerUser = async (req, res) => {
 
 
         const forbiddenRoles = [
-            "admin",
             "superAdmin",
-            "schoolAdmin"
+            "schoolAdmin",
+            "examCell"
         ];
 
         if (
@@ -368,7 +432,7 @@ const registerUser = async (req, res) => {
             personalEmail,
             universityAccount,
             roles,
-            status:status?status:"inactive",
+            status: status ? status : "inactive",
             schoolId,
             academicAssignments,
             setupToken: hashedToken,
@@ -483,10 +547,13 @@ const registerUser = async (req, res) => {
 
 
 
-const loginUser = async (req,res) =>{
+const loginUser = async (req, res) => {
 
-    const {personalEmail,universityAccount,password} = req.body;
+    const { personalEmail, universityAccount, password } = req.body;
 
 
 }
-module.exports = { register: registerUser ,login : registerUser};
+module.exports = {
+    register: registerUser,
+    login: loginUser
+};

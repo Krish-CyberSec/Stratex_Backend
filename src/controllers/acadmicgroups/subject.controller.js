@@ -3,6 +3,7 @@ const schoolModel = require("../../models/school.model");
 const programModel = require("../../models/program.model");
 const specializationModel = require("../../models/specelization.model");
 const auditLogModel = require("../../models/auditlog.model");
+const semesterModel = require("../../models/semester.model");
 
 const createSubject = async (req, res) => {
     try {
@@ -13,7 +14,7 @@ const createSubject = async (req, res) => {
             schoolId,
             programId,
             specializationId,
-            semester,
+            semesterId,
             credits,
             status
         } = req.body;
@@ -44,7 +45,7 @@ const createSubject = async (req, res) => {
             !name ||
             !schoolId ||
             !programId ||
-            !semester
+            !semesterId
         ) {
             return res.status(400).json({
                 message: "Missing required fields"
@@ -80,7 +81,7 @@ const createSubject = async (req, res) => {
         if (
             req.user.roles.includes("schoolAdmin") &&
             req.user.schoolId.toString() !==
-                schoolId.toString()
+            schoolId.toString()
         ) {
             return res.status(403).json({
                 message:
@@ -111,10 +112,29 @@ const createSubject = async (req, res) => {
             }
         }
 
+        const semester = await semesterModel.findById(semesterId);
+
+        if (!semester) {
+            return res.status(404).json({
+                message: "Semester not found"
+            });
+        }
+
+        if (
+            specializationId &&
+            semester.specializationId.toString() !==
+            specializationId.toString()
+        ) {
+            return res.status(400).json({
+                message:
+                    "Semester does not belong to selected specialization"
+            });
+        }
+
         const existingSubject =
             await subjectModel.findOne({
                 code: code.trim().toUpperCase(),
-                programId
+                semesterId
             });
 
         if (existingSubject) {
@@ -124,6 +144,28 @@ const createSubject = async (req, res) => {
             });
         }
 
+        if (
+            credits !== undefined &&
+            (isNaN(credits) || credits < 0)
+        ) {
+            return res.status(400).json({
+                message: "Invalid credits"
+            });
+        }
+
+        const allowedStatus = [
+            "active",
+            "inactive"
+        ];
+
+        if (
+            status &&
+            !allowedStatus.includes(status)
+        ) {
+            return res.status(400).json({
+                message: "Invalid status"
+            });
+        }
         const subject = await subjectModel.create({
             code: code.trim().toUpperCase(),
             name: name.trim(),
@@ -131,7 +173,7 @@ const createSubject = async (req, res) => {
             schoolId,
             programId,
             specializationId,
-            semester,
+            semesterId,
             credits,
             status,
             createdBy: req.user._id
@@ -155,6 +197,15 @@ const createSubject = async (req, res) => {
 
     } catch (err) {
         console.error(err);
+        await auditLogModel.create({
+            performedBy: req.user?._id,
+            action: "SUBJECT_CREATION_FAILED",
+            module: "Subject",
+            targetName: req.body?.name,
+            remarks: err.message,
+            ipAddress: req.ip,
+            userAgent: req.headers["user-agent"]
+        });
 
         return res.status(500).json({
             message: "Internal Server Error"
@@ -162,4 +213,4 @@ const createSubject = async (req, res) => {
     }
 };
 
-module.exports = { subjects:createSubject };
+module.exports = { subjects: createSubject };

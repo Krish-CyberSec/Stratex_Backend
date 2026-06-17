@@ -4,15 +4,29 @@ const schoolSchema = new mongoose.Schema({
     name: {
         type: String,
         required: true,
-        unique: true,
+        trim: true
+    },
+
+    slug: {
+        type: String,
+        required: true,
+        lowercase: true,
         trim: true
     }
     ,
-    description: String,
+    description: {
+        type: String,
+        trim: true
+    },
+    logo: {
+        type: String,
+        default: null
+    },
 
-    logo: String,
-
-    banner: String,
+    banner: {
+        type: String,
+        default: null
+    },
 
     status: {
         type: String,
@@ -27,18 +41,24 @@ const schoolSchema = new mongoose.Schema({
     updatedBy: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User'
-    },
-    slug: {
-        type: String,
-        required: true,
-        unique: true,
-        lowercase: true,
-        trim: true
+
     }
 },
     {
         timestamps: true
     })
+
+
+
+
+
+schoolSchema.index({ name: 1 }, { unique: true });
+schoolSchema.index({ slug: 1 }, { unique: true });
+
+
+schoolSchema.virtual("schoolUrl").get(function () {
+    return `/schools/${this.slug}`;
+});
 
 const schoolModel = mongoose.model('School', schoolSchema);
 

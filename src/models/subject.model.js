@@ -36,14 +36,16 @@ const subjectSchema = new mongoose.Schema(
             ref: "Specialization"
         },
 
-        semester: {
-            type: Number,
+        semesterId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Semester",
             required: true
         },
 
         credits: {
             type: Number,
-            default: 0
+            required: true,
+            min: 0
         },
 
         coordinatorId: {
@@ -51,6 +53,10 @@ const subjectSchema = new mongoose.Schema(
             ref: "User",
             default: null
         },
+        facultyIds: [{
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User"
+        }],
 
         status: {
             type: String,
@@ -61,12 +67,43 @@ const subjectSchema = new mongoose.Schema(
         createdBy: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "User"
+        },
+        updatedBy: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User"
         }
     },
     {
         timestamps: true
     }
 );
+
+subjectSchema.index(
+    {
+        code: 1,
+        semesterId: 1
+    },
+    {
+        unique: true
+    }
+);
+
+
+subjectSchema.index({
+    schoolId: 1
+});
+
+subjectSchema.index({
+    programId: 1
+});
+
+subjectSchema.index({
+    specializationId: 1
+});
+
+subjectSchema.index({
+    semesterId: 1
+});
 
 module.exports =
     mongoose.model("Subject", subjectSchema);

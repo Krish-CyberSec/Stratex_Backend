@@ -39,7 +39,13 @@ const createSpecialization = async (req, res) => {
             });
         }
 
+        const mongoose = require("mongoose");
 
+        if (!mongoose.Types.ObjectId.isValid(programId)) {
+            return res.status(400).json({
+                message: "Invalid program ID"
+            });
+        }
         const program = await programModel.findById(programId);
 
         if (!program) {
@@ -97,8 +103,8 @@ const createSpecialization = async (req, res) => {
 
         const specialization = await specializationModel.create({
             programId,
-            name,
-            description,
+            name: name.trim(),
+            description: description.trim(),
             status: status ? status : "active",
             createdBy: req.user._id
         })
@@ -116,7 +122,7 @@ const createSpecialization = async (req, res) => {
 
         return res.status(201).json({
             message: "Specialization created successfully",
-            specialization: specialization._id
+            specialization: specialization
         });
 
     }

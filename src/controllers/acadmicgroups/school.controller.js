@@ -38,6 +38,29 @@ const createSchool = async (req, res) => {
             });
         }
 
+
+
+
+
+        const slugRegex = /^[a-z0-9-]+$/;
+
+        if (!slugRegex.test(slug)) {
+            return res.status(400).json({
+                message: "Invalid slug format"
+            });
+        }
+
+        const normalizedName = name.trim();
+        const normalizedSlug = slug.trim();
+        const normalizedDescription = description.trim();
+
+
+        if (normalizedName.length < 3) {
+            return res.status(400).json({
+                message: "School name must be at least 3 characters"
+            });
+        }
+
         const allowedStatus = ["active", "inactive"];
 
         if (status && !allowedStatus.includes(status)) {
@@ -48,15 +71,15 @@ const createSchool = async (req, res) => {
 
         const isSchool = await schoolModel.findOne({
             $or: [
-                { name: name.trim() },
-                { slug: slug.trim() }
+                { name: normalizedName },
+                { slug: normalizedSlug }
             ]
         });
 
         if (isSchool) {
             await auditLogModel.create({
                 performedBy: req.user._id,
-                action: "REJECT",
+                action: "SCHOOL_CREATION_FAILED",
                 module: "School",
                 targetId: isSchool._id,
                 targetName: isSchool.name,
@@ -82,7 +105,7 @@ const createSchool = async (req, res) => {
                 schoolLogo = await schoolImg(
                     logo.buffer,
                     logo.originalname,
-                    slug,
+                    normalizedSlug,
                     "logo"
                 );
             }
@@ -91,7 +114,7 @@ const createSchool = async (req, res) => {
                 schoolBanner = await schoolImg(
                     banner.buffer,
                     banner.originalname,
-                    slug,
+                    normalizedSlug,
                     "banner"
                 );
             }
@@ -104,13 +127,13 @@ const createSchool = async (req, res) => {
         }
 
         const school = await schoolModel.create({
-            name,
+            name: normalizedName,
             description: description ? description : null,
             logo: schoolLogo ? schoolLogo.url : null,
             banner: schoolBanner ? schoolBanner.url : null,
             status: status ? status : "active",
             createdBy: req.user._id,
-            slug
+            slug: normalizedSlug
         });
 
 
@@ -127,7 +150,7 @@ const createSchool = async (req, res) => {
 
         return res.status(201).json({
             message: "School created successfully",
-            school:school._id
+            school
         });
 
     }
