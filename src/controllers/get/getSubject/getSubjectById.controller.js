@@ -1,4 +1,5 @@
-const subjectModel = require("../../models/subject.model");
+const subjectModel = require("../../../models/subject.model");
+
 
 const getSubjectById = async (req, res) => {
     try {
