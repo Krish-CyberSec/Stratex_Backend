@@ -85,7 +85,8 @@ const userSchema = new mongoose.Schema(
     universityAccount: {
       type: universityAccountSchema,
       required: function () {
-        return !this.roles.includes("superAdmin");}
+        return !this.roles?.includes("superAdmin");
+      }
     },
 
     // Academic Mapping

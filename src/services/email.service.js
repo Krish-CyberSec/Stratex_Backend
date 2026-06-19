@@ -4,6 +4,7 @@ require("dotenv").config()
 const transporter = nodemailer.createTransport({
     // service: "gmail",
     host: "smtp.ethereal.email",
+    port: 587,
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS
@@ -26,13 +27,20 @@ const sendSetupEmail = async (
 ) => {
     try {
         const fallbackURL = setupLink;
-
+        if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+            throw new Error("Email credentials missing in .env");
+        }
+        console.log({
+            user: process.env.EMAIL_USER,
+            pass: process.env.EMAIL_PASS ? "OK" : "MISSING",
+            emails
+        });
         const info = await transporter.sendMail({
-            from: `"Stratex" <${process.env.EMAIL}>`,
-            replyTo: process.env.EMAIL,
+            from: `"Stratex" <${process.env.EMAIL_USER}>`,
+            replyTo: process.env.EMAIL_USER,
 
             bcc: Array.isArray(emails)
-                ? emails.join(", ")
+                ? emails.filter(Boolean).join(",")
                 : emails,
 
             subject: "University Portal Account Setup",

@@ -5,7 +5,7 @@ const { programs } = require("../controllers/acadmicgroups/program.controller")
 const { schools } = require("../controllers/acadmicgroups/school.controller")
 const {Specialization} = require("../controllers/acadmicgroups/specialization.controller")
 const {subjects} = require("../controllers/acadmicgroups/subject.controller")
-
+const {createSemester} = require("../controllers/acadmicgroups/semester.controller")
 const multer = require('multer');
 
 const storage = multer.memoryStorage();
@@ -29,5 +29,5 @@ router.post(
 
 router.post("/specialization",authMiddleware.chkUser,Specialization)
 router.post('/subject',authMiddleware.chkUser,subjects)
-router.post("/semester",authMiddleware.chkUser,)
+router.post("/semester",authMiddleware.chkUser,createSemester)
 module.exports = router

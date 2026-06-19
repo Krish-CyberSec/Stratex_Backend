@@ -10,7 +10,6 @@ const createSemester = async (req, res) => {
             programId,
             specializationId,
             semesterNumber,
-            name,
             status
         } = req.body;
 
@@ -148,10 +147,7 @@ const createSemester = async (req, res) => {
                 programId,
                 specializationId:
                     specializationId || null,
-                semesterNumber,
-                name:
-                    name?.trim() ||
-                    `Semester ${semesterNumber}`,
+                semesterNumber:semesterNumber,
                 status:
                     status || "active",
                 createdBy:
@@ -165,7 +161,7 @@ const createSemester = async (req, res) => {
             module: "Semester",
             targetId: semester._id,
             targetName:
-                semester.name,
+                semester.semesterNumber,
             remarks:
                 "Semester created successfully",
             ipAddress: req.ip,
@@ -190,8 +186,6 @@ const createSemester = async (req, res) => {
                 action:
                     "SEMESTER_CREATION_FAILED",
                 module: "Semester",
-                targetName:
-                    req.body?.name,
                 remarks: err.message,
                 ipAddress: req.ip,
                 userAgent:

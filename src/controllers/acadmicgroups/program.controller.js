@@ -38,8 +38,7 @@ const createProgram = async (req, res) => {
         // Required fields
         if (
             !name ||
-            !schoolId ||
-            !description ||
+            !schoolId  ||
             !duration ||
             !degreeType
         ) {
@@ -49,7 +48,7 @@ const createProgram = async (req, res) => {
         }
 
         const normalizedName = name.trim();
-        const normalizedDescription = description.trim();
+        const normalizedDescription = description?description.trim():null;
 
         const parsedDuration = Number(duration);
 

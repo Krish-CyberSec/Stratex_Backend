@@ -13,7 +13,7 @@ const UploadProfile = async (fileBuffer, originalName) => {
             fileName: `User-${Date.now()}.${extension}`,
             folder: "/userProfiles"
         });
-        return response
+        
     }
     catch (err) {
         console.error("Error uploading file:", err.message);
@@ -42,4 +42,10 @@ const schoolImg = async (fileBuffer, originalName, slug, typeOf) => {
     }
 
 }
-module.exports = { UploadFiles: UploadProfile, schoolImg }
+
+
+
+const deleteFile = async (fileId) => {
+    return imagekitClient.files.delete(fileId);
+};
+module.exports = { UploadFiles: UploadProfile, schoolImg , deleteFile}

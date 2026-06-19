@@ -14,6 +14,7 @@ const auditLogSchema = new mongoose.Schema(
       required: true,
       enum: [
         "CREATE",
+        "BULK_CREATE",
         "UPDATE",
         "DELETE",
         "LOGIN",
@@ -52,7 +53,9 @@ const auditLogSchema = new mongoose.Schema(
         "Notice",
         "Event",
         "Resource",
-        "Subject"
+        "Subject",
+        "Auth",
+        "Semester"
       ]
     },
 

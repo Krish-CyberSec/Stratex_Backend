@@ -30,8 +30,8 @@ const createSchool = async (req, res) => {
 
         if (
             !name ||
-            !slug ||
-            !description
+            !slug 
+            
         ) {
             return res.status(400).json({
                 message: "All required fields are required"
@@ -52,7 +52,7 @@ const createSchool = async (req, res) => {
 
         const normalizedName = name.trim();
         const normalizedSlug = slug.trim();
-        const normalizedDescription = description.trim();
+        const normalizedDescription = description?description.trim():null;
 
 
         if (normalizedName.length < 3) {
