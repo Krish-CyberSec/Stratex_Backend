@@ -2,12 +2,14 @@ const express = require("express");
 const authMiddleware = require("../middlewares/auth.middleware");
 const validate = require("../middlewares/validate.middleware");
 const specializationModel = require("../models/specialization.model");
-const { Specialization: createSpecialization } = require("../controllers/acadmicgroups/specialization.controller");
+const {
+  Specialization: createSpecialization,
+  deleteSpecialization
+} = require("../controllers/acadmicgroups/specialization.controller");
 const {
   createListController,
   createGetByIdController,
-  createUpdateController,
-  createDeleteController
+  createUpdateController
 } = require("../controllers/rest.controller");
 
 const router = express.Router();
@@ -55,6 +57,6 @@ router.put(
   }),
   createUpdateController(specializationModel, options)
 );
-router.delete("/:id", authMiddleware.chkUser, validate.objectIdParam("id"), createDeleteController(specializationModel, options));
+router.delete("/:id", authMiddleware.chkUser, validate.objectIdParam("id"), deleteSpecialization);
 
 module.exports = router;

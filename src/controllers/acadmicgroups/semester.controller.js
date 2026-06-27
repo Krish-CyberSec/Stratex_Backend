@@ -1,6 +1,5 @@
 const semesterModel = require("../../models/semester.model");
 const programModel = require("../../models/program.model");
-const specializationModel = require("../../models/specelization.model");
 const auditLogModel = require("../../models/auditlog.model");
 
 const createSemester = async (req, res) => {
@@ -8,7 +7,6 @@ const createSemester = async (req, res) => {
 
         const {
             programId,
-            specializationId,
             semesterNumber,
             status
         } = req.body;
@@ -98,38 +96,11 @@ const createSemester = async (req, res) => {
             });
         }
 
-        // Specialization Validation (Optional)
-        if (specializationId) {
-
-            const specialization =
-                await specializationModel.findById(
-                    specializationId
-                );
-
-            if (!specialization) {
-                return res.status(404).json({
-                    message:
-                        "Specialization not found"
-                });
-            }
-
-            if (
-                specialization.programId.toString() !==
-                programId.toString()
-            ) {
-                return res.status(400).json({
-                    message:
-                        "Specialization does not belong to selected program"
-                });
-            }
-        }
-
         // Duplicate Check
         const existingSemester =
             await semesterModel.findOne({
                 programId,
-                specializationId:
-                    specializationId || null,
+                specializationId: null,
                 semesterNumber
             });
 
@@ -145,8 +116,7 @@ const createSemester = async (req, res) => {
         const semester =
             await semesterModel.create({
                 programId,
-                specializationId:
-                    specializationId || null,
+                specializationId: null,
                 semesterNumber:semesterNumber,
                 status:
                     status || "active",

@@ -27,28 +27,6 @@ const assertSemesterOwnership = (semester, assignment) => {
     error.statusCode = 400;
     throw error;
   }
-
-  if (assignment.specializationId) {
-    if (!semester.specializationId) {
-      const error = new Error("Selected semester is not linked to any specialization");
-      error.statusCode = 400;
-      throw error;
-    }
-
-    if (toId(semester.specializationId) !== toId(assignment.specializationId)) {
-      const error = new Error("Semester does not belong to selected specialization");
-      error.statusCode = 400;
-      throw error;
-    }
-
-    return;
-  }
-
-  if (semester.specializationId) {
-    const error = new Error("Semester belongs to a specialization");
-    error.statusCode = 400;
-    throw error;
-  }
 };
 
 const assertSubjectOwnership = (subject, assignment) => {

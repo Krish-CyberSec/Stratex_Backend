@@ -56,7 +56,10 @@ const auditLogSchema = new mongoose.Schema(
         "NOTIFICATION_PINNED",
         "NOTIFICATION_UNPINNED",
         "DUPLICATE_NOTIFICATION_PREVENTED",
-        "ANALYTICS_CACHE_REFRESH"
+        "ANALYTICS_CACHE_REFRESH",
+        "SEMESTER_AUTO_GENERATED",
+        "SEMESTER_REGENERATED",
+        "PROGRAM_DURATION_CHANGE"
         
       ]
     },

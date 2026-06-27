@@ -129,34 +129,11 @@ const createSubject = async (req, res) => {
             });
         }
 
-        if (specializationId) {
-
-            if (!semester.specializationId) {
-                return res.status(400).json({
-                    message:
-                        "Selected semester is not linked to any specialization"
-                });
-            }
-
-            if (
-                semester.specializationId.toString() !==
-                specializationId.toString()
-            ) {
-                return res.status(400).json({
-                    message:
-                    "Semester does not belong to selected specialization"
-                });
-            }
-        } else if (semester.specializationId) {
-            return res.status(400).json({
-                message:
-                    "Selected semester belongs to a specialization"
-            });
-        }
-
         const existingSubject =
             await subjectModel.findOne({
                 code: code.trim().toUpperCase(),
+                programId,
+                specializationId: specializationId || null,
                 semesterId
             });
 

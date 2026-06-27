@@ -2,12 +2,14 @@ const express = require("express");
 const authMiddleware = require("../middlewares/auth.middleware");
 const validate = require("../middlewares/validate.middleware");
 const programModel = require("../models/program.model");
-const { programs: createProgram } = require("../controllers/acadmicgroups/program.controller");
+const {
+  programs: createProgram,
+  updateProgram,
+  deleteProgram
+} = require("../controllers/acadmicgroups/program.controller");
 const {
   createListController,
-  createGetByIdController,
-  createUpdateController,
-  createDeleteController
+  createGetByIdController
 } = require("../controllers/rest.controller");
 
 const router = express.Router();
@@ -55,8 +57,8 @@ router.put(
     degreeType: { enum: ["UG", "PG", "Diploma", "PhD"] },
     status: { enum: ["active", "inactive"] },
   }),
-  createUpdateController(programModel, options)
+  updateProgram
 );
-router.delete("/:id", authMiddleware.chkUser, validate.objectIdParam("id"), createDeleteController(programModel, options));
+router.delete("/:id", authMiddleware.chkUser, validate.objectIdParam("id"), deleteProgram);
 
 module.exports = router;
