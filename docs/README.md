@@ -57,17 +57,17 @@ Required backend environment variables are documented in  [Deployment](./deploym
 
 ```mermaid
 flowchart LR
-  Client[Frontend] --> Express[Express app]
-  Express --> CookieParser[cookie-parser]
-  Express --> CORS[CORS credentials]
-  Express --> Audit[audit.middleware]
-  Audit --> Route[/api route]
-  Route --> Auth[auth.middleware chkUser]
-  Auth --> Controller[Controller]
-  Controller --> Service[Service]
-  Service --> Model[Mongoose model]
-  Model --> Mongo[(MongoDB)]
-  Controller --> Response[JSON response]
+  Client["Frontend"] --> Express["Express app"]
+  Express --> CookieParser["cookie-parser"]
+  Express --> CORS["CORS credentials"]
+  Express --> Audit["audit.middleware"]
+  Audit --> Route["/api route"]
+  Route --> Auth["auth.middleware chkUser"]
+  Auth --> Controller["Controller"]
+  Controller --> Service["Service"]
+  Service --> Model["Mongoose model"]
+  Model --> Mongo[("MongoDB")]
+  Controller --> Response["JSON response"]
 ```
 
 ## Core Business Rules
