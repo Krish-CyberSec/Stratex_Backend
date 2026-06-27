@@ -92,6 +92,8 @@ subjectSchema.index({
 subjectSchema.index(
     {
         code: 1,
+        programId: 1,
+        specializationId: 1,
         semesterId: 1
     },
     {

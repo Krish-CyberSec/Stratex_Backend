@@ -34,7 +34,10 @@ const getSubjects = async (req, res) => {
         }
 
         if (specializationId) {
-            filter.specializationId = normalizeObjectIdFilter(specializationId);
+            filter.$or = [
+                { specializationId: null },
+                { specializationId: normalizeObjectIdFilter(specializationId) }
+            ];
         }
 
         if (semester || semesterId) {
@@ -53,11 +56,21 @@ const getSubjects = async (req, res) => {
             filter.status = status || "active";
         }
 
-        Object.assign(filter, buildSearchFilter(req.query.search, [
+        const searchFilter = buildSearchFilter(req.query.search, [
             "code",
             "name",
             "description",
-        ]));
+        ]);
+
+        if (filter.$or && searchFilter.$or) {
+            filter.$and = [
+                { $or: filter.$or },
+                searchFilter
+            ];
+            delete filter.$or;
+        } else {
+            Object.assign(filter, searchFilter);
+        }
 
         const { page, limit, skip } = buildPagination(req.query);
         const sort = buildSort(req.query, [

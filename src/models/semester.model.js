@@ -39,15 +39,6 @@ const semesterSchema = new mongoose.Schema(
         timestamps: true
     });
 
-// semesterSchema.index(
-//     {
-//         specializationId: 1,
-//         semesterNumber: 1
-//     },
-//     {
-//         unique: true
-//     });
-
 semesterSchema.index(
 {
     programId: 1,
