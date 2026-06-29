@@ -185,12 +185,38 @@ const getMe = async (req, res) => {
 };
 
 
-const logout = (req, res) => {
+const logout = async (req, res) => {
+    let performedBy;
+    const token =
+        req.cookies?.access_token ||
+        req.headers.authorization?.split(" ")[1];
+
+    if (token) {
+        try {
+            performedBy = jwt.verify(token, process.env.JWT_SECRET)?.userId;
+        } catch {
+            performedBy = undefined;
+        }
+    }
+
     res.clearCookie("access_token", {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "strict",
     });
+
+    try {
+        await auditLogModel.create({
+            performedBy,
+            action: "LOGOUT",
+            module: "Auth",
+            remarks: "User logged out",
+            ipAddress: req.ip,
+            userAgent: req.headers["user-agent"]
+        });
+    } catch (auditErr) {
+        console.error("Logout audit log failed:", auditErr.message);
+    }
 
     return res.status(200).json({
         success: true,

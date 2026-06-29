@@ -1,77 +1,90 @@
+const crypto = require("node:crypto");
 const auditLogModel = require("../models/auditlog.model");
-const mongoose = require("mongoose");
+const requestLogModel = require("../models/requestlog.model");
+const {
+  runWithAuditContext,
+} = require("../services/audit/auditContext.service");
 
-const methodActionMap = {
-  GET: "READ",
-  POST: "CREATE",
-  PUT: "UPDATE",
-  PATCH: "UPDATE",
-  DELETE: "DELETE"
+const ignoredRequestMethods = new Set(["OPTIONS", "HEAD"]);
+
+const ignoredPathPatterns = [
+  /\/favicon\.ico$/i,
+  /\/health$/i,
+  /\/ping$/i,
+  /\/poll/i,
+];
+
+const shouldIgnoreRequest = (req, statusCode) => {
+  const path = req.originalUrl.split("?")[0];
+
+  return (
+    ignoredRequestMethods.has(req.method) ||
+    statusCode === 304 ||
+    ignoredPathPatterns.some((pattern) => pattern.test(path))
+  );
 };
 
-const moduleMap = {
-  users: "User",
-  schools: "School",
-  programs: "Program",
-  specializations: "Specialization",
-  subjects: "Subject",
-  notices: "Notice",
-  events: "Event",
-  dashboard: "Dashboard",
-  auth: "Auth",
-  notifications: "Notification"
-};
+const getRoute = (req) => req.originalUrl.split("?")[0];
 
-const getAction = (req) => {
-  if (req.originalUrl.includes("/auth/logout")) {
-    return "LOGOUT";
-  }
+const getResponseSize = (res) => {
+  const contentLength = res.getHeader("content-length");
+  const parsed = Number(contentLength);
 
-  if (req.originalUrl.includes("/auth/setup-password")) {
-    return "SETUP_PASSWORD";
-  }
-
-  return methodActionMap[req.method];
+  return Number.isFinite(parsed) ? parsed : 0;
 };
 
 const auditRequest = (req, res, next) => {
   const startedAt = Date.now();
+  const requestId = req.headers["x-request-id"] || crypto.randomUUID();
+  const route = getRoute(req);
+
+  req.requestId = requestId;
+  res.setHeader("X-Request-Id", requestId);
+
+  const context = {
+    requestId,
+    route,
+    method: req.method,
+    ipAddress: req.ip,
+    userAgent: req.headers["user-agent"],
+  };
 
   res.on("finish", async () => {
+    const durationMs = Date.now() - startedAt;
+
     try {
-      if (req.method !== "GET") {
-        return;
-      }
-
-      const pathAfterApi = req.originalUrl.split("?")[0].split("/api/")[1];
-      const resource = pathAfterApi?.split("/")[0];
-      const module = moduleMap[resource];
-      const action = getAction(req);
-      const targetId = req.params?.id || req.params?.userId || req.params?.subjectId;
-
-      if (!module || !action) {
-        return;
-      }
-
-      await auditLogModel.create({
-        performedBy: req.user?._id,
-        action,
-        module,
-        targetId: mongoose.isValidObjectId(targetId) ? targetId : undefined,
-        remarks: `${req.method} ${req.originalUrl} completed with ${res.statusCode}`,
-        newData: {
-          statusCode: res.statusCode,
-          durationMs: Date.now() - startedAt
+      await auditLogModel.updateMany(
+        {
+          requestId,
+          statusCode: { $exists: false },
         },
-        ipAddress: req.ip,
-        userAgent: req.headers["user-agent"]
+        {
+          $set: {
+            statusCode: res.statusCode,
+          },
+        }
+      );
+
+      if (shouldIgnoreRequest(req, res.statusCode) || res.statusCode < 500) {
+        return;
+      }
+
+      await requestLogModel.create({
+        requestId,
+        method: req.method,
+        route,
+        statusCode: res.statusCode,
+        durationMs,
+        ip: req.ip,
+        userAgent: req.headers["user-agent"],
+        responseSize: getResponseSize(res),
       });
     } catch (err) {
-      console.error("Audit middleware error:", err.message);
+      console.error("Request logging middleware error:", err.message);
     }
   });
 
-  next();
+  runWithAuditContext(context, next);
 };
 
 module.exports = auditRequest;

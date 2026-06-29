@@ -86,15 +86,6 @@ const createGetByIdController = (model, options = {}) => async (req, res) => {
       return sendError(res, 404, `${options.resourceName} not found`);
     }
 
-    await writeAudit(
-      req,
-      "UPDATE",
-      options.resourceName,
-      document._id,
-      document.name || document.title,
-      `${options.resourceName} updated successfully`
-    );
-
     return sendSuccess(
       res,
       200,
@@ -110,6 +101,12 @@ const createGetByIdController = (model, options = {}) => async (req, res) => {
 
 const createUpdateController = (model, options = {}) => async (req, res) => {
   try {
+    const documentExists = await model.exists({ _id: req.params.id });
+
+    if (!documentExists) {
+      return sendError(res, 404, `${options.resourceName} not found`);
+    }
+
     const update = {
       ...req.body,
       updatedBy: req.user._id
@@ -124,9 +121,14 @@ const createUpdateController = (model, options = {}) => async (req, res) => {
       }
     );
 
-    if (!document) {
-      return sendError(res, 404, `${options.resourceName} not found`);
-    }
+    await writeAudit(
+      req,
+      "UPDATE",
+      options.resourceName,
+      document._id,
+      document.name || document.title,
+      `${options.resourceName} updated successfully`
+    );
 
     return sendSuccess(
       res,

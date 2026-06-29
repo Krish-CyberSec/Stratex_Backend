@@ -3,6 +3,12 @@ const auditLogModel = require("../../models/auditlog.model");
 
 const getActorId = (req) => req.user?._id || req.authUser?._id;
 
+const ignoredNotificationAuditActions = new Set([
+  "READ_NOTIFICATION",
+  "READ_ALL_NOTIFICATION",
+  "READ_MULTIPLE_NOTIFICATION",
+]);
+
 const normalizeTargetId = (targetId) =>
   mongoose.isValidObjectId(targetId) ? targetId : undefined;
 
@@ -20,6 +26,10 @@ const writeNotificationAudit = async (
   }
 ) => {
   try {
+    if (ignoredNotificationAuditActions.has(action)) {
+      return;
+    }
+
     const audit = {
       performedBy: getActorId(req),
       action,
