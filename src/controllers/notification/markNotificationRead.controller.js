@@ -1,24 +1,13 @@
 const mongoose = require("mongoose");
 const userNotificationModel = require("../../models/userNotificaton.model");
-const auditLogModel = require("../../models/auditlog.model");
 const { sendError, sendSuccess } = require("../../utils/apiResponse");
 const {
   validateNotificationIds,
 } = require("../../services/notification/notificationValidation.service");
 const notificationCache = require("../../services/notification/notificationCache.service");
-
-const writeReadAudit = async (req, action, targetId, newData = {}) => {
-  await auditLogModel.create({
-    performedBy: req.user._id,
-    action,
-    module: "Notification",
-    targetId,
-    newData,
-    remarks: action,
-    ipAddress: req.ip,
-    userAgent: req.headers["user-agent"],
-  });
-};
+const {
+  writeNotificationAudit,
+} = require("../../services/notification/notificationAudit.service");
 
 const markNotificationRead = async (req, res) => {
   try {
@@ -45,9 +34,14 @@ const markNotificationRead = async (req, res) => {
       return sendError(res, 404, "Notification not found");
     }
 
-    await writeReadAudit(req, "READ_NOTIFICATION", req.params.id, {
-      notificationId: req.params.id,
-      readAt: now,
+    await writeNotificationAudit(req, {
+      action: "READ_NOTIFICATION",
+      targetId: req.params.id,
+      newData: {
+        notificationId: req.params.id,
+        readAt: now,
+      },
+      remarks: "Notification marked as read",
     });
 
     notificationCache.invalidate();
@@ -85,10 +79,15 @@ const markManyNotificationsRead = async (req, res) => {
       }
     );
 
-    await writeReadAudit(req, "READ_MULTIPLE_NOTIFICATION", undefined, {
-      notificationIds,
-      modifiedCount: result.modifiedCount,
-      readAt: now,
+    await writeNotificationAudit(req, {
+      action: "READ_MULTIPLE_NOTIFICATION",
+      newData: {
+        notificationIds,
+        matchedCount: result.matchedCount,
+        modifiedCount: result.modifiedCount,
+        readAt: now,
+      },
+      remarks: "Multiple notifications marked as read",
     });
 
     notificationCache.invalidate();
@@ -121,9 +120,14 @@ const markAllNotificationsRead = async (req, res) => {
       }
     );
 
-    await writeReadAudit(req, "READ_ALL_NOTIFICATION", undefined, {
-      modifiedCount: result.modifiedCount,
-      readAt: now,
+    await writeNotificationAudit(req, {
+      action: "READ_ALL_NOTIFICATION",
+      newData: {
+        matchedCount: result.matchedCount,
+        modifiedCount: result.modifiedCount,
+        readAt: now,
+      },
+      remarks: "All notifications marked as read",
     });
 
     notificationCache.invalidate();

@@ -1,7 +1,6 @@
 const mongoose = require("mongoose");
 const notificationModel = require("../../models/notificaton.Model");
 const userNotificationModel = require("../../models/userNotificaton.model");
-const auditLogModel = require("../../models/auditlog.model");
 const { sendError, sendSuccess } = require("../../utils/apiResponse");
 const { resolveAudience } = require("../../services/notification/audience.service");
 const {
@@ -11,6 +10,9 @@ const {
   findRecentDuplicate,
 } = require("../../services/notification/notificationDuplicate.service");
 const notificationCache = require("../../services/notification/notificationCache.service");
+const {
+  writeNotificationAudit,
+} = require("../../services/notification/notificationAudit.service");
 
 const creatorRoles = ["superAdmin", "schoolAdmin", "faculty", "coordinator", "examCell"];
 
@@ -32,12 +34,35 @@ const createNotification = async (req, res) => {
 
   try {
     if (!hasAllowedRole(req.authUser || req.user, creatorRoles)) {
+      await writeNotificationAudit(req, {
+        action: "UNAUTHORIZED_NOTIFICATION_CREATE_ATTEMPT",
+        newData: {
+          title: req.body?.title,
+          type: req.body?.type,
+          priority: req.body?.priority,
+          audience: req.body?.audience,
+        },
+        remarks: "Unauthorized notification create attempt",
+      });
+
       return sendError(res, 403, "You are not allowed to create notifications");
     }
 
     const { errors, audience } = validateCreateNotification(req.body);
 
     if (errors.length) {
+      await writeNotificationAudit(req, {
+        action: "CREATE_NOTIFICATION_FAILED",
+        newData: {
+          title: req.body?.title,
+          type: req.body?.type,
+          priority: req.body?.priority,
+          audience: req.body?.audience,
+          validationErrors: errors,
+        },
+        remarks: "Notification create validation failed",
+      });
+
       return sendError(res, 400, "Validation failed", errors);
     }
 
@@ -55,10 +80,8 @@ const createNotification = async (req, res) => {
     );
 
     if (duplicateResult?.notification) {
-      await auditLogModel.create({
-        performedBy: req.user._id,
+      await writeNotificationAudit(req, {
         action: "DUPLICATE_NOTIFICATION_PREVENTED",
-        module: "Notification",
         targetId: duplicateResult.notification._id,
         targetName: duplicateResult.notification.title,
         newData: {
@@ -67,8 +90,6 @@ const createNotification = async (req, res) => {
           audience,
         },
         remarks: "Duplicate notification prevented",
-        ipAddress: req.ip,
-        userAgent: req.headers["user-agent"],
       });
 
       return sendSuccess(res, 200, "Duplicate notification prevented", {
@@ -120,29 +141,20 @@ const createNotification = async (req, res) => {
       });
     }
 
-    await auditLogModel.create(
-      [
-        {
-          performedBy: req.user._id,
-          action: "CREATE_NOTIFICATION",
-          module: "Notification",
-          targetId: notification._id,
-          targetName: notification.title,
-          newData: {
-            notificationId: notification._id,
-            recipientCount: count,
-            audience,
-          },
-          remarks: "Notification created and delivered",
-          ipAddress: req.ip,
-          userAgent: req.headers["user-agent"],
-        },
-      ],
-      { session }
-    );
-
     await session.commitTransaction();
     notificationCache.invalidate();
+
+    await writeNotificationAudit(req, {
+      action: "CREATE_NOTIFICATION",
+      targetId: notification._id,
+      targetName: notification.title,
+      newData: {
+        notificationId: notification._id,
+        recipientCount: count,
+        audience,
+      },
+      remarks: "Notification created and delivered",
+    });
 
     return sendSuccess(res, 201, "Notification created successfully", {
       notification,
@@ -155,6 +167,19 @@ const createNotification = async (req, res) => {
 
     const statusCode = err.message?.includes("No active users") ? 400 : 500;
     console.error("Create notification failed:", err);
+
+    await writeNotificationAudit(req, {
+      action: "CREATE_NOTIFICATION_FAILED",
+      newData: {
+        title: req.body?.title,
+        type: req.body?.type,
+        priority: req.body?.priority,
+        audience: req.body?.audience,
+        error: err.message,
+      },
+      remarks:
+        statusCode === 400 ? err.message : "Notification create failed",
+    });
 
     return sendError(
       res,

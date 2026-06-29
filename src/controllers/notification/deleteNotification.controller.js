@@ -1,22 +1,10 @@
 const mongoose = require("mongoose");
 const userNotificationModel = require("../../models/userNotificaton.model");
-const auditLogModel = require("../../models/auditlog.model");
 const { sendError, sendSuccess } = require("../../utils/apiResponse");
 const notificationCache = require("../../services/notification/notificationCache.service");
-
-const writeDeleteAudit = async (req, action, targetId, oldData, newData) => {
-  await auditLogModel.create({
-    performedBy: req.user._id,
-    action,
-    module: "Notification",
-    targetId,
-    oldData,
-    newData,
-    remarks: action,
-    ipAddress: req.ip,
-    userAgent: req.headers["user-agent"],
-  });
-};
+const {
+  writeNotificationAudit,
+} = require("../../services/notification/notificationAudit.service");
 
 const softDeleteNotification = async (req, res) => {
   try {
@@ -48,9 +36,15 @@ const softDeleteNotification = async (req, res) => {
       { new: true }
     );
 
-    await writeDeleteAudit(req, "DELETE_NOTIFICATION", req.params.id, oldRecord, {
-      isDeleted: updated.isDeleted,
-      deletedAt: updated.deletedAt,
+    await writeNotificationAudit(req, {
+      action: "DELETE_NOTIFICATION",
+      targetId: req.params.id,
+      oldData: oldRecord,
+      newData: {
+        isDeleted: updated.isDeleted,
+        deletedAt: updated.deletedAt,
+      },
+      remarks: "Notification deleted successfully",
     });
 
     notificationCache.invalidate();
@@ -92,9 +86,15 @@ const restoreNotification = async (req, res) => {
       { new: true }
     );
 
-    await writeDeleteAudit(req, "RESTORE_NOTIFICATION", req.params.id, oldRecord, {
-      isDeleted: updated.isDeleted,
-      deletedAt: updated.deletedAt,
+    await writeNotificationAudit(req, {
+      action: "RESTORE_NOTIFICATION",
+      targetId: req.params.id,
+      oldData: oldRecord,
+      newData: {
+        isDeleted: updated.isDeleted,
+        deletedAt: updated.deletedAt,
+      },
+      remarks: "Notification restored successfully",
     });
 
     notificationCache.invalidate();

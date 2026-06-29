@@ -1,24 +1,12 @@
 const mongoose = require("mongoose");
 const userNotificationModel = require("../../models/userNotificaton.model");
-const auditLogModel = require("../../models/auditlog.model");
 const { sendError, sendSuccess } = require("../../utils/apiResponse");
 const notificationCache = require("../../services/notification/notificationCache.service");
+const {
+  writeNotificationAudit,
+} = require("../../services/notification/notificationAudit.service");
 
 const PIN_LIMIT = Number(process.env.NOTIFICATION_PIN_LIMIT) || 5;
-
-const writePinAudit = async (req, action, targetId, oldData, newData) => {
-  await auditLogModel.create({
-    performedBy: req.user._id,
-    action,
-    module: "Notification",
-    targetId,
-    oldData,
-    newData,
-    remarks: action,
-    ipAddress: req.ip,
-    userAgent: req.headers["user-agent"],
-  });
-};
 
 const pinNotification = async (req, res) => {
   try {
@@ -66,9 +54,15 @@ const pinNotification = async (req, res) => {
       { new: true }
     );
 
-    await writePinAudit(req, "NOTIFICATION_PINNED", req.params.id, userNotification, {
-      isPinned: true,
-      pinnedAt: now,
+    await writeNotificationAudit(req, {
+      action: "NOTIFICATION_PINNED",
+      targetId: req.params.id,
+      oldData: userNotification,
+      newData: {
+        isPinned: true,
+        pinnedAt: now,
+      },
+      remarks: "Notification pinned successfully",
     });
 
     notificationCache.invalidate();
@@ -114,9 +108,15 @@ const unpinNotification = async (req, res) => {
       { new: true }
     );
 
-    await writePinAudit(req, "NOTIFICATION_UNPINNED", req.params.id, oldRecord, {
-      isPinned: false,
-      pinnedAt: null,
+    await writeNotificationAudit(req, {
+      action: "NOTIFICATION_UNPINNED",
+      targetId: req.params.id,
+      oldData: oldRecord,
+      newData: {
+        isPinned: false,
+        pinnedAt: null,
+      },
+      remarks: "Notification unpinned successfully",
     });
 
     notificationCache.invalidate();
