@@ -4,7 +4,19 @@ const auditLogModel = require("../../models/auditlog.model")
 
 const createSchool = async (req, res) => {
     try {
-        const { name, description, status, slug } = req.body;
+        const {
+            name,
+            description,
+            status,
+            slug,
+            email,
+            phone,
+            website,
+            code,
+            vision,
+            mission,
+            departmentCount
+        } = req.body;
 
         // Authorization
         const allowedRoles = ["superAdmin"];
@@ -126,6 +138,13 @@ const createSchool = async (req, res) => {
         const school = await schoolModel.create({
             name: normalizedName,
             description: description ? description : null,
+            email: email ? email.trim() : null,
+            phone: phone ? phone.trim() : null,
+            website: website ? website.trim() : null,
+            code: code ? code.trim() : null,
+            vision: vision ? vision.trim() : null,
+            mission: mission ? mission.trim() : null,
+            departmentCount: departmentCount ? Number(departmentCount) : 0,
             logo: schoolLogo ? schoolLogo.url : null,
             banner: schoolBanner ? schoolBanner.url : null,
             status: status ? status : "active",
