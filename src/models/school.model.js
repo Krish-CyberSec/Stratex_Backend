@@ -18,6 +18,45 @@ const schoolSchema = new mongoose.Schema({
         type: String,
         trim: true
     },
+
+    email: {
+        type: String,
+        trim: true,
+        lowercase: true
+    },
+
+    phone: {
+        type: String,
+        trim: true
+    },
+
+    website: {
+        type: String,
+        trim: true
+    },
+
+    code: {
+        type: String,
+        trim: true,
+        uppercase: true
+    },
+
+    vision: {
+        type: String,
+        trim: true
+    },
+
+    mission: {
+        type: String,
+        trim: true
+    },
+
+    departmentCount: {
+        type: Number,
+        min: 0,
+        default: 0
+    },
+
     logo: {
         type: String,
         default: null

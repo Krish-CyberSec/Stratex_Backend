@@ -23,7 +23,7 @@ const options = {
   resourceName: "School",
   resourceKey: "school",
   collectionName: "schools",
-  searchFields: ["name", "slug", "description"],
+  searchFields: ["name", "slug", "description", "email", "phone", "code"],
   filterMap: {
     status: "status",
   },
@@ -47,6 +47,8 @@ router.post(
     name: { required: true, minLength: 3 },
     slug: { required: true, minLength: 2 },
     status: { enum: ["active", "inactive"] },
+    email: { type: "email" },
+    departmentCount: { type: "number", min: 0 },
   }),
   createSchool
 );
@@ -58,6 +60,8 @@ router.put(
     name: { minLength: 3 },
     slug: { minLength: 2 },
     status: { enum: ["active", "inactive"] },
+    email: { type: "email" },
+    departmentCount: { type: "number", min: 0 },
   }),
   createUpdateController(schoolModel, options)
 );
