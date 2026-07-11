@@ -8,6 +8,12 @@ const programSchema = new mongoose.Schema(
         trim: true
     },
 
+    code: {
+        type: String,
+        trim: true,
+        uppercase: true
+    },
+
     schoolId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "School",
@@ -61,6 +67,16 @@ programSchema.index({
     name: 1
 }, {
     unique: true
+});
+
+programSchema.index({
+    schoolId: 1,
+    code: 1
+}, {
+    unique: true,
+    partialFilterExpression: {
+        code: { $type: "string" }
+    }
 });
 
 const programModel = mongoose.model(

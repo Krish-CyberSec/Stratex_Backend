@@ -18,15 +18,16 @@ const options = {
   resourceName: "Program",
   resourceKey: "program",
   collectionName: "programs",
-  searchFields: ["name", "description", "degreeType"],
+  searchFields: ["name", "code", "description", "degreeType"],
   filterMap: {
     school: { field: "schoolId", type: "objectId" },
     schoolId: { field: "schoolId", type: "objectId" },
+    degreeType: "degreeType",
     status: "status",
   },
-  allowedSortFields: ["name", "duration", "degreeType", "status", "createdAt", "updatedAt"],
+  allowedSortFields: ["name", "code", "duration", "degreeType", "status", "createdAt", "updatedAt"],
   populate: [
-    { path: "schoolId", select: "name slug" },
+    { path: "schoolId", select: "name slug code" },
     { path: "createdBy", select: "firstName lastName" },
     { path: "updatedBy", select: "firstName lastName" }
   ]
@@ -39,6 +40,7 @@ router.post(
   authMiddleware.chkUser,
   validate({
     name: { required: true, minLength: 2 },
+    code: { minLength: 2 },
     schoolId: { required: true, type: "objectId" },
     duration: { required: true, type: "number", min: 1 },
     degreeType: { required: true, enum: ["UG", "PG", "Diploma", "PhD"] },
@@ -52,6 +54,7 @@ router.put(
   validate.objectIdParam("id"),
   validate({
     name: { minLength: 2 },
+    code: { minLength: 2 },
     schoolId: { type: "objectId" },
     duration: { type: "number", min: 1 },
     degreeType: { enum: ["UG", "PG", "Diploma", "PhD"] },

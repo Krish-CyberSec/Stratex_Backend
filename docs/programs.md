@@ -13,16 +13,18 @@ Programs belong to schools and own semester generation.
 
 ## Model
 
-Fields: `name`, `schoolId`, `description`, `status`, `duration`, `degreeType`, `createdBy`, `updatedBy`.
+Fields: `name`, `code`, `schoolId`, `description`, `status`, `duration`, `degreeType`, `createdBy`, `updatedBy`.
 
 Unique index:
 
 - `schoolId + name`
+- `schoolId + code` when code is present
 
 ## Business Rules
 
 - `duration` is years.
 - Creating a program generates `duration * 2` semesters.
+- Program code can be entered manually. If omitted, backend auto-generates a school-scoped code.
 - Specializations do not generate semesters.
 - Duration increase creates missing semesters only.
 - Duration decrease is rejected when higher semesters have dependent academic data.

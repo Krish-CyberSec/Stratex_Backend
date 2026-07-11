@@ -10,10 +10,84 @@ const {
 } = require("../../services/academic/semesterGeneration.service");
 const { sendError, sendSuccess } = require("../../utils/apiResponse");
 
+const normalizeProgramCode = (code) =>
+    code
+        ? String(code)
+            .trim()
+            .toUpperCase()
+            .replace(/[^A-Z0-9-]/g, "-")
+            .replace(/-+/g, "-")
+            .replace(/^-|-$/g, "")
+        : "";
+
+const buildNameAcronym = (name) => {
+    const words = String(name || "")
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean);
+
+    const acronym = words
+        .filter((word) => !["of", "and", "the", "in", "for"].includes(word.toLowerCase()))
+        .map((word) => word[0])
+        .join("")
+        .slice(0, 8)
+        .toUpperCase();
+
+    return acronym || "PROGRAM";
+};
+
+const getSchoolCode = (school) =>
+    normalizeProgramCode(school?.code || school?.slug || school?.name || "SCH");
+
+const generateUniqueProgramCode = async ({
+    school,
+    schoolId,
+    name,
+    excludeProgramId
+}) => {
+    const baseCode = normalizeProgramCode(`${getSchoolCode(school)}-${buildNameAcronym(name)}`);
+    let candidate = baseCode;
+    let counter = 2;
+
+    while (
+        await programModel.exists({
+            schoolId,
+            code: candidate,
+            ...(excludeProgramId ? { _id: { $ne: excludeProgramId } } : {})
+        })
+    ) {
+        candidate = `${baseCode}-${counter}`;
+        counter += 1;
+    }
+
+    return candidate;
+};
+
+const assertProgramCodeAvailable = async ({
+    code,
+    schoolId,
+    excludeProgramId
+}) => {
+    if (!code) return;
+
+    const existingProgram = await programModel.exists({
+        schoolId,
+        code,
+        ...(excludeProgramId ? { _id: { $ne: excludeProgramId } } : {})
+    });
+
+    if (existingProgram) {
+        const error = new Error("Program code already exists in this school");
+        error.statusCode = 409;
+        throw error;
+    }
+};
+
 const createProgram = async (req, res) => {
     try {
         const {
             name,
+            code,
             schoolId,
             description,
             status,
@@ -56,6 +130,7 @@ const createProgram = async (req, res) => {
         }
 
         const normalizedName = name.trim();
+        const normalizedCode = normalizeProgramCode(code);
         const normalizedDescription = description?description.trim():null;
 
         const parsedDuration = Number(duration);
@@ -131,6 +206,17 @@ const createProgram = async (req, res) => {
             });
         }
 
+        await assertProgramCodeAvailable({
+            code: normalizedCode,
+            schoolId
+        });
+
+        const programCode = normalizedCode || await generateUniqueProgramCode({
+            school,
+            schoolId,
+            name: normalizedName
+        });
+
         const session = await mongoose.startSession();
         let program;
 
@@ -139,13 +225,14 @@ const createProgram = async (req, res) => {
 
             [program] = await programModel.create([{
                 name: normalizedName,
+                code: programCode,
                 schoolId,
                 description: normalizedDescription,
                 status: status || "active",
                 duration: parsedDuration,
                 degreeType,
                 createdBy: req.user._id
-            }], { session });
+            }], { session, ordered: true });
 
             const semesterResult = await generateProgramSemesters({
                 programId: program._id,
@@ -177,7 +264,7 @@ const createProgram = async (req, res) => {
                 remarks: "Semesters automatically generated for program",
                 ipAddress: req.ip,
                 userAgent: req.headers["user-agent"]
-            }], { session });
+            }], { session, ordered: true });
 
             await session.commitTransaction();
         } catch (err) {
@@ -209,8 +296,8 @@ const createProgram = async (req, res) => {
             console.error("Audit Log Error:", auditErr);
         }
 
-        return res.status(500).json({
-            message: "Internal Server Error"
+        return res.status(err.statusCode || 500).json({
+            message: err.statusCode ? err.message : "Internal Server Error"
         });
     }
 };
@@ -251,6 +338,36 @@ const updateProgram = async (req, res) => {
         });
 
         const oldDuration = program.duration;
+        const nextSchoolId = req.body.schoolId || program.schoolId;
+        const nextName = req.body.name ? req.body.name.trim() : program.name;
+        const nextSchool = req.body.schoolId
+            ? await schoolModel.findById(req.body.schoolId)
+            : await schoolModel.findById(program.schoolId);
+
+        if (!nextSchool) {
+            return sendError(res, 404, "School not found");
+        }
+
+        let nextCode;
+
+        if (req.body.code !== undefined) {
+            nextCode = normalizeProgramCode(req.body.code);
+            if (!nextCode) {
+                nextCode = await generateUniqueProgramCode({
+                    school: nextSchool,
+                    schoolId: nextSchoolId,
+                    name: nextName,
+                    excludeProgramId: program._id
+                });
+            } else {
+                await assertProgramCodeAvailable({
+                    code: nextCode,
+                    schoolId: nextSchoolId,
+                    excludeProgramId: program._id
+                });
+            }
+        }
+
         const session = await mongoose.startSession();
 
         try {
@@ -258,6 +375,7 @@ const updateProgram = async (req, res) => {
 
             const update = {
                 ...req.body,
+                ...(nextCode !== undefined ? { code: nextCode } : {}),
                 duration: nextDuration,
                 updatedBy: req.user._id
             };
@@ -302,7 +420,7 @@ const updateProgram = async (req, res) => {
                     remarks: "Program duration updated",
                     ipAddress: req.ip,
                     userAgent: req.headers["user-agent"]
-                }], { session });
+                }], { session, ordered: true });
             }
 
             await session.commitTransaction();
