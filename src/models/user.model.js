@@ -52,12 +52,17 @@ const academicAssignmentSchema = new mongoose.Schema(
      * Used ONLY for Faculty / Coordinator
      * Students should always have an empty array.
      */
-    assignedSubjects: [
-      {
+    assignedSubjects: {
+      type: [{
         type: mongoose.Schema.Types.ObjectId,
-        ref: "Subject",
-      },
-    ],
+        ref: "Subject"
+      }],
+      validate: {
+        validator: function (subjects) {
+          return true;
+        }
+      }
+    },
 
     /**
      * Coordinator for this academic assignment
@@ -81,7 +86,7 @@ const academicAssignmentSchema = new mongoose.Schema(
      */
     status: {
       type: String,
-      enum: ["active", "inactive","suspended"],
+      enum: ["active", "inactive", "suspended"],
       default: "active",
     },
 

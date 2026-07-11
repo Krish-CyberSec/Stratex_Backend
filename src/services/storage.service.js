@@ -25,7 +25,7 @@ const UploadProfile = async (fileBuffer, originalName) => {
         return await getImageKitClient().files.upload({
             file: fileBuffer.toString("base64"),
             fileName: `User-${Date.now()}.${extension}`,
-            folder: "/userProfiles"
+            folder: "/acadmics/userProfiles"
         });
         
     }

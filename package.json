@@ -6,7 +6,9 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "npx nodemon server.js",
-    "start": "node server.js"
+    "start": "node server.js",
+    "indexes:check": "node src/scripts/syncIndexes.js --check",
+    "indexes:sync": "node src/scripts/syncIndexes.js"
   },
   "keywords": [],
   "author": "",
