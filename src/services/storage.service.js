@@ -56,9 +56,25 @@ const schoolImg = async (fileBuffer, originalName, slug, typeOf) => {
 
 }
 
+const noticeAttachment = async (fileBuffer, originalName) => {
+    try {
+        const extension = originalName.split('.').pop();
+
+        return await getImageKitClient().files.upload({
+            file: fileBuffer.toString("base64"),
+            fileName: `Notice-${Date.now()}.${extension}`,
+            folder: "/acadmics/NoticeAttachments"
+        });
+    }
+    catch (err) {
+        console.error("Error uploading notice attachment:", err.message);
+        throw err;
+    }
+}
+
 
 
 const deleteFile = async (fileId) => {
     return getImageKitClient().files.delete(fileId);
 };
-module.exports = { UploadFiles: UploadProfile, schoolImg , deleteFile}
+module.exports = { UploadFiles: UploadProfile, schoolImg, noticeAttachment, deleteFile}

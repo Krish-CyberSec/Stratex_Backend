@@ -14,7 +14,7 @@ const noticeSchema = new mongoose.Schema(
     },
     audience: {
       type: [String],
-      enum: ["superAdmin", "schoolAdmin", "faculty", "student", "examCell", "all"],
+      enum: ["superAdmin", "schoolAdmin", "faculty", "coordinator", "student", "examCell", "all"],
       default: ["all"]
     },
     status: {
@@ -25,6 +25,28 @@ const noticeSchema = new mongoose.Schema(
     publishedAt: {
       type: Date,
       default: Date.now
+    },
+    attachment: {
+      url: {
+        type: String,
+        default: null
+      },
+      fileId: {
+        type: String,
+        default: null
+      },
+      name: {
+        type: String,
+        default: null
+      },
+      fileType: {
+        type: String,
+        default: null
+      },
+      size: {
+        type: Number,
+        default: null
+      }
     },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
