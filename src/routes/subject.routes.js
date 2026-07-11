@@ -36,7 +36,12 @@ router.put(
   authMiddleware.chkUser,
   validate.objectIdParam("id"),
   validate({
+    code: { minLength: 2 },
     name: { minLength: 2 },
+    schoolId: { type: "objectId" },
+    programId: { type: "objectId" },
+    specializationId: { type: "objectId" },
+    semesterId: { type: "objectId" },
     credits: { type: "number", min: 0 },
     status: { enum: ["active", "inactive"] },
   }),

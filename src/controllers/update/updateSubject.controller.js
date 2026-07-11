@@ -7,8 +7,13 @@ const updateSubject = async (req, res) => {
         const { subjectId } = req.params;
 
         const {
+            code,
             name,
             description,
+            schoolId,
+            programId,
+            specializationId,
+            semesterId,
             credits,
             status
         } = req.body;
@@ -48,6 +53,29 @@ const updateSubject = async (req, res) => {
             });
         }
 
+        const isSuperAdmin =
+            req.user.roles.includes("superAdmin");
+
+        const restrictedFields = [
+            "code",
+            "schoolId",
+            "programId",
+            "specializationId",
+            "semesterId"
+        ];
+
+        const hasRestrictedUpdate =
+            restrictedFields.some(field =>
+                Object.prototype.hasOwnProperty.call(req.body, field)
+            );
+
+        if (hasRestrictedUpdate && !isSuperAdmin) {
+            return res.status(403).json({
+                message:
+                    "Only super admin can update subject academic context"
+            });
+        }
+
         // Validation
 
         if (
@@ -78,6 +106,30 @@ const updateSubject = async (req, res) => {
         }
 
         // Update only allowed fields
+
+        if (isSuperAdmin && code) {
+            subject.code = code.trim().toUpperCase();
+        }
+
+        if (isSuperAdmin && schoolId) {
+            subject.schoolId = schoolId;
+        }
+
+        if (isSuperAdmin && programId) {
+            subject.programId = programId;
+        }
+
+        if (isSuperAdmin && semesterId) {
+            subject.semesterId = semesterId;
+        }
+
+        if (
+            isSuperAdmin &&
+            Object.prototype.hasOwnProperty.call(req.body, "specializationId")
+        ) {
+            subject.specializationId =
+                specializationId || undefined;
+        }
 
         if (name) {
             subject.name = name.trim();
@@ -138,6 +190,13 @@ const updateSubject = async (req, res) => {
 
         } catch (auditErr) {
             console.error(auditErr);
+        }
+
+        if (err.code === 11000) {
+            return res.status(409).json({
+                message:
+                    "Subject already exists for this academic context"
+            });
         }
 
         return res.status(500).json({
