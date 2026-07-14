@@ -217,11 +217,93 @@ const deleteSpecialization = async (req, res) => {
     }
 };
 
+const updateSpecialization = async (req, res) => {
+    try {
+        const allowedRoles = ["superAdmin", "schoolAdmin"];
+
+        if (!req.user.roles.some(role => allowedRoles.includes(role))) {
+            return sendError(res, 403, "Unauthorized");
+        }
+
+        const specialization = await specializationModel.findById(req.params.id);
+
+        if (!specialization) {
+            return sendError(res, 404, "Specialization not found");
+        }
+
+        const nextProgramId = req.body.programId || specialization.programId;
+
+        if (!mongoose.Types.ObjectId.isValid(nextProgramId)) {
+            return sendError(res, 400, "Invalid program ID");
+        }
+
+        const program = await programModel.findById(nextProgramId);
+
+        if (!program) {
+            return sendError(res, 404, "Program not found");
+        }
+
+        if (
+            req.user.roles.includes("schoolAdmin") &&
+            req.user.schoolId.toString() !== program.schoolId.toString()
+        ) {
+            return sendError(res, 403, "School Admin can only update specializations in their own school");
+        }
+
+        const nextName = req.body.name !== undefined ? req.body.name.trim() : specialization.name;
+
+        if (nextName.length < 2) {
+            return sendError(res, 400, "Name must be at least 2 characters");
+        }
+
+        const duplicate = await specializationModel.findOne({
+            _id: { $ne: specialization._id },
+            programId: nextProgramId,
+            name: nextName,
+        });
+
+        if (duplicate) {
+            return sendError(res, 409, "Specialization already exists in this program");
+        }
+
+        if (req.body.programId !== undefined) specialization.programId = nextProgramId;
+        if (req.body.name !== undefined) specialization.name = nextName;
+        if (req.body.description !== undefined) specialization.description = req.body.description.trim();
+        if (req.body.status !== undefined) specialization.status = req.body.status;
+        specialization.updatedBy = req.user._id;
+
+        await specialization.save();
+
+        await auditLogModel.create({
+            performedBy: req.user._id,
+            action: "UPDATE",
+            module: "Specialization",
+            targetId: specialization._id,
+            targetName: specialization.name,
+            remarks: "Specialization updated successfully",
+            ipAddress: req.ip,
+            userAgent: req.headers["user-agent"]
+        });
+
+        const updatedSpecialization = await specializationModel
+            .findById(specialization._id)
+            .populate("programId", "name degreeType schoolId")
+            .populate("createdBy", "firstName lastName")
+            .populate("updatedBy", "firstName lastName");
+
+        return sendSuccess(res, 200, "Specialization updated successfully", updatedSpecialization);
+    } catch (err) {
+        console.error(err);
+        return sendError(res, 500, "Internal server error");
+    }
+};
+
 
 
 module.exports = {
     Specialization: createSpecialization,
-    deleteSpecialization
+    deleteSpecialization,
+    updateSpecialization
 }
 
 

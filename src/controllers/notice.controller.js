@@ -100,38 +100,80 @@ const buildReceivedNoticeFilter = (user = {}) => {
     ...assignments.map((assignment) => assignment.semesterId),
   ]);
 
-  const audienceMatches = [
-    { audience: "all" },
-    { "audienceCriteria.allUsers": true },
-    { "audienceCriteria.userIds": user._id },
-  ];
+  const emptyAudienceField = (field) => ({
+    $or: [
+      { [field]: { $exists: false } },
+      { [field]: { $size: 0 } },
+    ],
+  });
+  const criterionAllows = (field, values = []) => {
+    const emptyField = emptyAudienceField(field);
+
+    if (!values.length) return emptyField;
+
+    return {
+      $or: [
+        ...emptyField.$or,
+        { [field]: { $in: values } },
+      ],
+    };
+  };
+  const specializationAllows = specializationIds.length
+    ? criterionAllows("audienceCriteria.specializationIds", specializationIds)
+    : {
+        $or: [
+          ...emptyAudienceField("audienceCriteria.specializationIds").$or,
+          { "audienceCriteria.includeUsersWithoutSpecialization": true },
+        ],
+      };
+  const criteriaScopedMatch = {
+    $and: [
+      { audienceCriteria: { $ne: null } },
+      user._id
+        ? { "audienceCriteria.excludeUserIds": { $ne: user._id } }
+        : {},
+      roles.length
+        ? { "audienceCriteria.excludeRoles": { $nin: roles } }
+        : {},
+      {
+        $or: [
+          { "audienceCriteria.allUsers": true },
+          user._id ? { "audienceCriteria.userIds": user._id } : {},
+          {
+            $and: [
+              criterionAllows("audienceCriteria.roles", roles),
+              criterionAllows("audienceCriteria.schoolIds", schoolId ? [schoolId] : []),
+              criterionAllows("audienceCriteria.programIds", programIds),
+              specializationAllows,
+              criterionAllows("audienceCriteria.semesterIds", semesterIds),
+            ],
+          },
+        ],
+      },
+    ],
+  };
+  const legacyAudienceMatches = [{ audience: "all" }];
 
   if (roles.length) {
-    audienceMatches.push(
-      { audience: { $in: roles } },
-      { "audienceCriteria.roles": { $in: roles } },
-    );
-  }
-
-  if (schoolId) {
-    audienceMatches.push({ "audienceCriteria.schoolIds": schoolId });
-  }
-
-  if (programIds.length) {
-    audienceMatches.push({ "audienceCriteria.programIds": { $in: programIds } });
-  }
-
-  if (specializationIds.length) {
-    audienceMatches.push({ "audienceCriteria.specializationIds": { $in: specializationIds } });
-  }
-
-  if (semesterIds.length) {
-    audienceMatches.push({ "audienceCriteria.semesterIds": { $in: semesterIds } });
+    legacyAudienceMatches.push({ audience: { $in: roles } });
   }
 
   return {
     status: "published",
-    $or: audienceMatches,
+    $or: [
+      criteriaScopedMatch,
+      {
+        $and: [
+          {
+            $or: [
+              { audienceCriteria: null },
+              { audienceCriteria: { $exists: false } },
+            ],
+          },
+          { $or: legacyAudienceMatches },
+        ],
+      },
+    ],
   };
 };
 
@@ -436,6 +478,114 @@ const createNoticeNotification = async ({ notice, req, session }) => {
   return { notification, recipientCount: count };
 };
 
+const getNoticeAttachments = (notice) => {
+  if (!notice.attachment?.url) return [];
+
+  return [
+    {
+      name: notice.attachment.name,
+      url: notice.attachment.url,
+      fileType: notice.attachment.fileType,
+      size: notice.attachment.size,
+    },
+  ];
+};
+
+const syncNoticeNotification = async ({ notice, req }) => {
+  const existingNotification = await notificationModel.findOne({
+    "reference.model": "Notice",
+    "reference.id": notice._id,
+  });
+
+  if (notice.status !== "published") {
+    if (existingNotification) {
+      const now = new Date();
+
+      await Promise.all([
+        notificationModel.findByIdAndUpdate(existingNotification._id, {
+          isExpired: true,
+          expiredAt: now,
+        }),
+        userNotificationModel.updateMany(
+          { notificationId: existingNotification._id, isDeleted: false },
+          { isDeleted: true, deletedAt: now }
+        ),
+      ]);
+
+      notificationCache.invalidate();
+    }
+
+    return { notification: existingNotification || null, recipientCount: 0 };
+  }
+
+  const audience = notice.audienceCriteria || toNotificationAudience(notice.audience);
+  const { users, count } = await resolveAudience(audience);
+
+  if (!count) {
+    throw new Error("No active users matched the selected notice audience");
+  }
+
+  if (!existingNotification) {
+    return createNoticeNotification({ notice, req });
+  }
+
+  const recipientIds = users.map((user) => user._id);
+  const now = new Date();
+
+  const notification = await notificationModel.findByIdAndUpdate(
+    existingNotification._id,
+    {
+      title: notice.title,
+      message: notice.content,
+      audience,
+      isExpired: false,
+      expiredAt: null,
+      metadata: {
+        ...(existingNotification.metadata || {}),
+        noticeId: notice._id,
+        attachments: getNoticeAttachments(notice),
+      },
+    },
+    { new: true }
+  );
+
+  await userNotificationModel.deleteMany({
+    notificationId: existingNotification._id,
+    userId: { $nin: recipientIds },
+  });
+
+  const existingDeliveries = await userNotificationModel
+    .find({
+      notificationId: existingNotification._id,
+      userId: { $in: recipientIds },
+    })
+    .select("userId")
+    .lean();
+  const deliveredUserIds = new Set(existingDeliveries.map((item) => String(item.userId)));
+  const missingDeliveries = users
+    .filter((user) => !deliveredUserIds.has(String(user._id)))
+    .map((user) => ({
+      notificationId: existingNotification._id,
+      userId: user._id,
+      deliveredAt: now,
+      status: "delivered",
+    }));
+
+  for (const docs of chunk(missingDeliveries, 5000)) {
+    if (!docs.length) continue;
+
+    try {
+      await userNotificationModel.insertMany(docs, { ordered: false });
+    } catch (err) {
+      if (err.code !== 11000) throw err;
+    }
+  }
+
+  notificationCache.invalidate();
+
+  return { notification, recipientCount: count };
+};
+
 const createNotice = async (req, res) => {
   const session = await mongoose.startSession();
 
@@ -541,18 +691,45 @@ const updateNotice = async (req, res) => {
     }
 
     if (update.audience || update.audienceCriteria) {
+      const nextAudienceCriteria =
+        update.audienceCriteria ||
+        (update.audience
+          ? toNotificationAudience(update.audience)
+          : notice.audienceCriteria || toNotificationAudience(notice.audience));
       const scopedAudience = enforceNoticeAudienceScope(
         req,
         update.audience || notice.audience,
-        update.audienceCriteria || notice.audienceCriteria || toNotificationAudience(update.audience || notice.audience),
+        nextAudienceCriteria,
       );
       update.audience = scopedAudience.audience;
       update.audienceCriteria = scopedAudience.audienceCriteria;
       update.schoolId = scopedAudience.schoolId;
     }
 
+    const finalStatus = update.status || notice.status;
+    const finalAudienceCriteria =
+      update.audienceCriteria || notice.audienceCriteria || toNotificationAudience(update.audience || notice.audience);
+
+    if (finalStatus === "published") {
+      const { count } = await resolveAudience(finalAudienceCriteria);
+
+      if (!count) {
+        return sendError(res, 400, "No active users matched the selected notice audience");
+      }
+    }
+
     if (req.file) {
       update.attachment = await buildAttachmentPayload(req.file);
+    }
+
+    if (req.body.removeAttachment === "true" || req.body.removeAttachment === true) {
+      update.attachment = {
+        url: null,
+        fileId: null,
+        name: null,
+        fileType: null,
+        size: null,
+      };
     }
 
     const updatedNotice = await noticeModel.findByIdAndUpdate(
@@ -564,13 +741,18 @@ const updateNotice = async (req, res) => {
       }
     );
 
+    const notificationResult = await syncNoticeNotification({
+      notice: updatedNotice,
+      req,
+    });
+
     await auditLogModel.create({
       performedBy: req.user._id,
       action: "UPDATE",
       module: "Notice",
       targetId: updatedNotice._id,
       targetName: updatedNotice.title,
-      remarks: "Notice updated successfully",
+      remarks: `Notice updated successfully. Recipients synced: ${notificationResult.recipientCount}`,
       ipAddress: req.ip,
       userAgent: req.headers["user-agent"],
     });

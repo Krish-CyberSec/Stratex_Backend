@@ -4,12 +4,12 @@ const validate = require("../middlewares/validate.middleware");
 const specializationModel = require("../models/specialization.model");
 const {
   Specialization: createSpecialization,
-  deleteSpecialization
+  deleteSpecialization,
+  updateSpecialization
 } = require("../controllers/acadmicgroups/specialization.controller");
 const {
   createListController,
-  createGetByIdController,
-  createUpdateController
+  createGetByIdController
 } = require("../controllers/rest.controller");
 
 const router = express.Router();
@@ -55,7 +55,7 @@ router.put(
     description: { minLength: 2 },
     status: { enum: ["active", "inactive"] },
   }),
-  createUpdateController(specializationModel, options)
+  updateSpecialization
 );
 router.delete("/:id", authMiddleware.chkUser, validate.objectIdParam("id"), deleteSpecialization);
 
