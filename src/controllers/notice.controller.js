@@ -549,6 +549,14 @@ const syncNoticeNotification = async ({ notice, req }) => {
     { new: true }
   );
 
+  const removedDeliveries = await userNotificationModel
+    .find({
+      notificationId: existingNotification._id,
+      userId: { $nin: recipientIds },
+    })
+    .select("userId")
+    .lean();
+
   await userNotificationModel.deleteMany({
     notificationId: existingNotification._id,
     userId: { $nin: recipientIds },
@@ -579,6 +587,28 @@ const syncNoticeNotification = async ({ notice, req }) => {
     } catch (err) {
       if (err.code !== 11000) throw err;
     }
+  }
+
+  try {
+    const socketService = require("../services/socket.service");
+    const removedUserIds = removedDeliveries.map((item) => String(item.userId));
+    const addedUserIds = missingDeliveries.map((item) => String(item.userId));
+
+    socketService.emitToUsers(removedUserIds, "notification:removed", {
+      notificationId: String(existingNotification._id),
+      reference: {
+        model: "Notice",
+        id: String(notice._id),
+      },
+      reason: "audience_updated",
+    });
+
+    socketService.emitToUsers(addedUserIds, "notification:new", {
+      notification,
+      deliveredAt: now,
+    });
+  } catch (emitErr) {
+    console.error("Notice notification sync emit failed:", emitErr);
   }
 
   notificationCache.invalidate();
