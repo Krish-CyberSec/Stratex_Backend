@@ -72,9 +72,27 @@ const noticeAttachment = async (fileBuffer, originalName) => {
     }
 }
 
+const eventImage = async (fileBuffer, originalName, typeOf) => {
+    try {
+        const extension = originalName.split('.').pop();
+
+        return await getImageKitClient().files.upload({
+            file: fileBuffer.toString("base64"),
+            fileName: `Event-${typeOf}-${Date.now()}.${extension}`,
+            folder: typeOf === "poster"
+                ? "/acadmics/EventPosters"
+                : "/acadmics/EventBanners",
+        });
+    }
+    catch (err) {
+        console.error("Error uploading event image:", err.message);
+        throw err;
+    }
+}
+
 
 
 const deleteFile = async (fileId) => {
     return getImageKitClient().files.delete(fileId);
 };
-module.exports = { UploadFiles: UploadProfile, schoolImg, noticeAttachment, deleteFile}
+module.exports = { UploadFiles: UploadProfile, schoolImg, noticeAttachment, eventImage, deleteFile}

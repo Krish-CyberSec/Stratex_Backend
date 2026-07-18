@@ -22,6 +22,22 @@ const eventSchema = new mongoose.Schema(
       type: String,
       trim: true
     },
+    banner: {
+      type: String,
+      default: null
+    },
+    bannerFileId: {
+      type: String,
+      default: null
+    },
+    poster: {
+      type: String,
+      default: null
+    },
+    posterFileId: {
+      type: String,
+      default: null
+    },
     status: {
       type: String,
       enum: ["scheduled", "completed", "cancelled", "inactive"],
