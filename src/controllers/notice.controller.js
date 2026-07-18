@@ -8,7 +8,7 @@ const userNotificationModel = require("../models/userNotificaton.model");
 const { resolveAudience } = require("../services/notification/audience.service");
 const { validateAudience } = require("../services/notification/notificationValidation.service");
 const notificationCache = require("../services/notification/notificationCache.service");
-const { noticeAttachment } = require("../services/storage.service");
+const { noticeAttachment, deleteFile } = require("../services/storage.service");
 const {
   createListController,
 } = require("./rest.controller");
@@ -478,6 +478,21 @@ const createNoticeNotification = async ({ notice, req, session }) => {
   return { notification, recipientCount: count };
 };
 
+const deleteStoredNoticeFile = async (notice) => {
+  const fileId = notice?.attachment?.fileId;
+
+  if (!fileId) return null;
+
+  const result = await Promise.allSettled([Promise.resolve().then(() => deleteFile(fileId))]);
+  const deleteResult = result[0];
+
+  return {
+    fileId,
+    status: deleteResult.status,
+    reason: deleteResult.reason?.message,
+  };
+};
+
 const getNoticeAttachments = (notice) => {
   if (!notice.attachment?.url) return [];
 
@@ -861,9 +876,50 @@ module.exports = {
 
       await assertCanManageNotice(req, notice);
 
-      notice.status = "inactive";
-      notice.updatedBy = req.user._id;
-      await notice.save();
+      const oldData = notice.toObject();
+      const deletedFile = await deleteStoredNoticeFile(notice);
+      const notifications = await notificationModel
+        .find({
+          "reference.model": "Notice",
+          "reference.id": notice._id,
+        })
+        .select("_id")
+        .lean();
+      const notificationIds = notifications.map((notification) => notification._id);
+      const oldDeliveries = notificationIds.length
+        ? await userNotificationModel
+            .find({ notificationId: { $in: notificationIds } })
+            .select("userId notificationId")
+            .lean()
+        : [];
+
+      if (notificationIds.length) {
+        await Promise.all([
+          userNotificationModel.deleteMany({ notificationId: { $in: notificationIds } }),
+          notificationModel.deleteMany({ _id: { $in: notificationIds } }),
+        ]);
+        notificationCache.invalidate();
+
+        try {
+          const socketService = require("../services/socket.service");
+          socketService.emitToUsers(
+            oldDeliveries.map((delivery) => String(delivery.userId)),
+            "notification:removed",
+            {
+              notificationIds: notificationIds.map(String),
+              reference: {
+                model: "Notice",
+                id: String(notice._id),
+              },
+              reason: "notice_deleted",
+            }
+          );
+        } catch (emitErr) {
+          console.error("Notice delete notification removal emit failed:", emitErr);
+        }
+      }
+
+      await notice.deleteOne();
 
       await auditLogModel.create({
         performedBy: req.user._id,
@@ -871,7 +927,12 @@ module.exports = {
         module: "Notice",
         targetId: notice._id,
         targetName: notice.title,
-        remarks: "Notice deleted successfully",
+        oldData,
+        metadata: {
+          deletedFile,
+          deletedNotificationIds: notificationIds,
+        },
+        remarks: "Notice permanently deleted",
         ipAddress: req.ip,
         userAgent: req.headers["user-agent"],
       });
