@@ -27,7 +27,8 @@ const getTransporter = () => {
 const sendSetupEmail = async (
     emails,
     fullName,
-    setupLink
+    setupLink,
+    temporaryPassword
 ) => {
     try {
         const fallbackURL = setupLink;
@@ -52,6 +53,10 @@ const sendSetupEmail = async (
 Hello ${fullName},
 
 Your Stratex account has been created.
+
+Temporary password:
+
+${temporaryPassword || "Use the setup link to create your password."}
 
 Set your password using the link below:
 
@@ -122,6 +127,17 @@ If you did not request this account setup, please ignore this email or contact s
             <p style="color:#60748a;font-size:14px;line-height:1.6;">
                 Your university account has been created. Please set your password to activate your account.
             </p>
+
+            ${temporaryPassword ? `
+            <div style="background:#f8fbff;border:1px solid #bdd7e8;padding:12px;border-radius:6px;margin:15px 0;">
+                <p style="margin:0 0 6px 0;font-size:13px;color:#60748a;">
+                    Temporary password
+                </p>
+                <p style="margin:0;font-size:16px;font-weight:bold;color:#10233f;letter-spacing:0.4px;">
+                    ${temporaryPassword}
+                </p>
+            </div>
+            ` : ""}
 
             <!-- EXPIRY INFO -->
             <div style="background:#eef7fc;border:1px solid #bdd7e8;border-left:4px solid #0868ad;padding:12px;border-radius:6px;margin:15px 0;">

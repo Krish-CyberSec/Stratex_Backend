@@ -67,12 +67,7 @@ const getSubjects = async (req, res) => {
             filter.programId = assignedProgramId;
             filter.semesterId = { $in: allowedSemesters.map((item) => item._id) };
 
-            if (assignedSpecializationId) {
-                filter.$or = [
-                    { specializationId: null },
-                    { specializationId: assignedSpecializationId }
-                ];
-            }
+            filter.specializationId = assignedSpecializationId || null;
         }
 
         if (!isStudent && schoolId) {

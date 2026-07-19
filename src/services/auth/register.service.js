@@ -1,8 +1,11 @@
 const mongoose = require("mongoose");
+const crypto = require("crypto");
+const bcrypt = require("bcryptjs");
 const userModel = require("../../models/user.model");
 const schoolModel = require("../../models/school.model");
 const auditLogModel = require("../../models/auditlog.model");
 const sendSetupEmail = require("../email.service");
+const { UploadFiles } = require("../storage.service");
 const {
   assertCanCreateRoleSet,
   assertCanCreateUsers,
@@ -25,6 +28,11 @@ const createHttpError = (message, statusCode) => {
   const error = new Error(message);
   error.statusCode = statusCode;
   return error;
+};
+
+const generateTemporaryPassword = () => {
+  const random = crypto.randomBytes(9).toString("base64url");
+  return `Stratex@${random}1`;
 };
 
 const validateBasicUserFields = async (userData, roles) => {
@@ -80,6 +88,8 @@ const prepareUsersForCreation = async (req, usersData) => {
     });
 
     const setupToken = createSetupToken();
+    const temporaryPassword = generateTemporaryPassword();
+    const hashedPassword = await bcrypt.hash(temporaryPassword, 10);
 
     usersToCreate.push({
       firstName: userData.firstName,
@@ -92,10 +102,13 @@ const prepareUsersForCreation = async (req, usersData) => {
       schoolId: userData.schoolId || undefined,
       academicAssignments: academic.academicAssignments,
       currentSemester: academic.currentSemester,
+      password: hashedPassword,
+      mustChangePassword: true,
       setupToken: setupToken.hashedToken,
       setupTokenExpiry: setupToken.expiresAt,
       createdBy: req.user._id,
       __rawToken: setupToken.rawToken,
+      __temporaryPassword: temporaryPassword,
     });
   }
 
@@ -113,7 +126,12 @@ const sendSetupEmails = async (users, usersToCreate) => {
     }
 
     const setupLink = `${process.env.CLIENT_URL}/setup-password/${sourceUser.__rawToken}`;
-    await sendSetupEmail(emails, user.fullName, setupLink);
+    await sendSetupEmail(
+      emails,
+      user.fullName,
+      setupLink,
+      sourceUser.__temporaryPassword
+    );
   }
 };
 
@@ -128,10 +146,18 @@ const registerUsers = async (req) => {
     try {
       session.startTransaction();
 
+      let uploadedProfileImage = null;
+      if (req.file && usersToCreate.length === 1) {
+        uploadedProfileImage = await UploadFiles(
+          req.file.buffer,
+          req.file.originalname
+        );
+      }
+
       const users = await userModel.create(
-        usersToCreate.map(({ __rawToken, ...dbUser }) => ({
+        usersToCreate.map(({ __rawToken, __temporaryPassword, ...dbUser }, index) => ({
           ...dbUser,
-          profileImage: null,
+          profileImage: index === 0 ? uploadedProfileImage?.url || null : null,
         })),
         { session, ordered: true }
       );

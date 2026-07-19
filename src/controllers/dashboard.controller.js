@@ -143,13 +143,7 @@ const getStudentDashboard = async (req, res) => {
       ...(semesterId ? { semesterId } : {})
     };
 
-    if (specializationId) {
-      subjectFilter.$or = [
-        { specializationId },
-        { specializationId: null },
-        { specializationId: { $exists: false } }
-      ];
-    }
+    subjectFilter.specializationId = specializationId || null;
 
     const [subjects, notices, events] = await Promise.all([
       subjectModel

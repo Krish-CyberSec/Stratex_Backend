@@ -5,8 +5,15 @@ const { registerUsers } = require("../services/auth/register.service");
 
 require('dotenv').config();
 
+const normalizeRegisterBody = (req) => {
+    if (req.body?.payload && typeof req.body.payload === "string") {
+        req.body = JSON.parse(req.body.payload);
+    }
+};
+
 const registerUser = async (req, res) => {
     try {
+        normalizeRegisterBody(req);
         const result = await registerUsers(req);
         return res.status(result.statusCode).json(result.body);
     }
