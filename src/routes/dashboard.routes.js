@@ -4,6 +4,7 @@ const dashboardController = require("../controllers/dashboard.controller");
 
 const router = express.Router();
 
+router.get("/student", authMiddleware.chkUser, dashboardController.getStudentDashboard);
 router.get("/stats", authMiddleware.chkUser, dashboardController.getStats);
 router.get("/recent-users", authMiddleware.chkUser, dashboardController.getRecentUsers);
 router.get("/recent-activities", authMiddleware.chkUser, dashboardController.getRecentActivities);
