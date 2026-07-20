@@ -41,6 +41,7 @@ const auditActions = [
   "FACULTY_REMOVED",
   "COORDINATOR_ASSIGNED",
   "COORDINATOR_REMOVED",
+  "STUDENT_ENROLLED",
   "STUDENT_REGISTERED",
   "STUDENT_PROMOTED",
   "NOTICE_CREATED",
@@ -95,6 +96,7 @@ const normalizeLegacyAction = (action, module, remarks) => {
       UNAUTHORIZED_CREATE_ATTEMPT: "PERMISSION_DENIED",
       UNAUTHORIZED_UPDATE_ATTEMPT: "PERMISSION_DENIED",
       UNAUTHORIZED_DELETE_ATTEMPT: "PERMISSION_DENIED",
+      ENROLL: "STUDENT_ENROLLED",
     },
     School: {
       CREATE: "SCHOOL_CREATED",
@@ -241,6 +243,8 @@ const auditLogSchema = new mongoose.Schema(
       required: true,
       enum: [
         "User",
+        "StudentEnrollment",
+        "FacultyAssignment",
         "School",
         "Program",
         "Specialization",

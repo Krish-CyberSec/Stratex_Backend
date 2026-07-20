@@ -21,6 +21,9 @@ const { validateRoles } = require("../user/validateRole.service");
 const {
   validateAcademicAssignments,
 } = require("../user/validateAcademicAssignment.service");
+const {
+  syncStudentEnrollments,
+} = require("../studentEnrollment/studentEnrollment.service");
 
 const allowedStatus = ["active", "inactive", "suspended"];
 
@@ -164,6 +167,16 @@ const registerUsers = async (req) => {
 
       await sendSetupEmails(users, usersToCreate);
 
+      await Promise.all(
+        users.map((user) =>
+          syncStudentEnrollments({
+            student: user,
+            actorId: req.user._id,
+            session,
+          })
+        )
+      );
+
       await auditLogModel.create(
         [
           {
@@ -184,11 +197,11 @@ const registerUsers = async (req) => {
               .filter((assignment) => assignment.sectionId)
               .map((assignment) => ({
                 performedBy: req.user._id,
-                action: "SECTION_ASSIGNED",
-                module: "User",
+                action: "STUDENT_ENROLLED",
+                module: "StudentEnrollment",
                 targetId: user._id,
                 targetName: `${user.firstName} ${user.lastName}`,
-                remarks: `User assigned to section ${assignment.sectionId}`,
+                remarks: `Student enrolled in section ${assignment.sectionId}`,
                 ipAddress: req.ip,
                 userAgent: req.headers["user-agent"],
               }))

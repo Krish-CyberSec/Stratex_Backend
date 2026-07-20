@@ -4,6 +4,9 @@ const auditLogModel = require("../../models/auditlog.model");
 const {
     validateTeachingSection,
 } = require("../../services/section/sectionAssignment.service");
+const {
+    upsertFacultyAssignment,
+} = require("../../services/facultyAssignment/facultyAssignment.service");
 
 const assignCoordinatorToSubject = async (req, res) => {
     try {
@@ -149,6 +152,15 @@ const assignCoordinatorToSubject = async (req, res) => {
                 });
                 await coordinator.save();
             }
+
+            await upsertFacultyAssignment({
+                facultyId: coordinator._id,
+                academicYearId,
+                sectionId,
+                subjectId: subject._id,
+                role: "coordinator",
+                actorId: req.user._id,
+            });
         }
 
         await auditLogModel.create({

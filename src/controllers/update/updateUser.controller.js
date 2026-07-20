@@ -2,6 +2,9 @@ const userModel = require("../../models/user.model");
 const auditLogModel = require("../../models/auditlog.model");
 const { UploadFiles } = require("../../services/storage.service");
 const { validateAcademicAssignments } = require("../../services/user/validateAcademicAssignment.service");
+const {
+    syncStudentEnrollments,
+} = require("../../services/studentEnrollment/studentEnrollment.service");
 
 const normalizeBody = (req) => {
     if (req.body?.payload && typeof req.body.payload === "string") {
@@ -161,6 +164,11 @@ const updateUser = async (req, res) => {
 
         await user.save();
 
+        await syncStudentEnrollments({
+            student: user,
+            actorId: req.user._id,
+        });
+
         await auditLogModel.create({
             performedBy: req.user._id,
             action: "UPDATE",
@@ -177,11 +185,13 @@ const updateUser = async (req, res) => {
             await auditLogModel.create(
                 newSectionAssignments.map((assignment) => ({
                     performedBy: req.user._id,
-                    action: "SECTION_ASSIGNED",
-                    module: "User",
+                    action: user.roles.includes("student") ? "STUDENT_ENROLLED" : "SECTION_ASSIGNED",
+                    module: user.roles.includes("student") ? "StudentEnrollment" : "User",
                     targetId: user._id,
                     targetName: `${user.firstName} ${user.lastName}`,
-                    remarks: `User assigned to section ${assignment.sectionId}`,
+                    remarks: user.roles.includes("student")
+                        ? `Student enrolled in section ${assignment.sectionId}`
+                        : `User assigned to section ${assignment.sectionId}`,
                     ipAddress: req.ip,
                     userAgent: req.headers["user-agent"]
                 }))
