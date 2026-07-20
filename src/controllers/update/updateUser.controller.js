@@ -1,9 +1,19 @@
 const userModel = require("../../models/user.model");
 const auditLogModel = require("../../models/auditlog.model");
 const { UploadFiles } = require("../../services/storage.service");
+const { validateAcademicAssignments } = require("../../services/user/validateAcademicAssignment.service");
+
+const normalizeBody = (req) => {
+    if (req.body?.payload && typeof req.body.payload === "string") {
+        req.body = JSON.parse(req.body.payload);
+    }
+};
+
+const toId = (value) => String(value?._id || value || "");
 
 const updateUser = async (req, res) => {
     try {
+        normalizeBody(req);
 
         const { userId } = req.params;
 
@@ -12,7 +22,8 @@ const updateUser = async (req, res) => {
             lastName,
             personalEmail,
             phoneNumber,
-            status
+            status,
+            academicAssignments
         } = req.body;
 
         const allowedRoles = [
@@ -110,6 +121,34 @@ const updateUser = async (req, res) => {
             user.status = status;
         }
 
+        let newSectionAssignments = [];
+
+        if (Array.isArray(academicAssignments) && canManageUsers) {
+            const previousSectionKeys = new Set(
+                (user.academicAssignments || [])
+                    .filter((assignment) => assignment.sectionId)
+                    .map((assignment) => `${toId(assignment.sectionId)}:${toId(assignment.academicYearId)}:${toId(assignment.programId)}:${toId(assignment.semesterId)}`)
+            );
+            const academic = await validateAcademicAssignments({
+                userData: {
+                    ...user.toObject(),
+                    schoolId: user.schoolId,
+                    academicAssignments,
+                    currentSemester: user.currentSemester,
+                },
+                roles: user.roles,
+            });
+
+            user.academicAssignments = academic.academicAssignments;
+            user.currentSemester = academic.currentSemester;
+
+            newSectionAssignments = academic.academicAssignments.filter((assignment) => {
+                if (!assignment.sectionId) return false;
+                const key = `${toId(assignment.sectionId)}:${toId(assignment.academicYearId)}:${toId(assignment.programId)}:${toId(assignment.semesterId)}`;
+                return !previousSectionKeys.has(key);
+            });
+        }
+
         if (req.file) {
             const profileImage = await UploadFiles(
                 req.file.buffer,
@@ -133,6 +172,21 @@ const updateUser = async (req, res) => {
             ipAddress: req.ip,
             userAgent: req.headers["user-agent"]
         });
+
+        if (newSectionAssignments.length) {
+            await auditLogModel.create(
+                newSectionAssignments.map((assignment) => ({
+                    performedBy: req.user._id,
+                    action: "SECTION_ASSIGNED",
+                    module: "User",
+                    targetId: user._id,
+                    targetName: `${user.firstName} ${user.lastName}`,
+                    remarks: `User assigned to section ${assignment.sectionId}`,
+                    ipAddress: req.ip,
+                    userAgent: req.headers["user-agent"]
+                }))
+            );
+        }
 
         return res.status(200).json({
             message: "User updated successfully",
@@ -159,8 +213,8 @@ const updateUser = async (req, res) => {
             console.error(auditErr);
         }
 
-        return res.status(500).json({
-            message: "Internal Server Error"
+        return res.status(err.statusCode || 500).json({
+            message: err.statusCode ? err.message : "Internal Server Error"
         });
     }
 };

@@ -1,12 +1,15 @@
 const subjectModel = require("../../models/subject.model");
 const userModel = require("../../models/user.model");
 const auditLogModel = require("../../models/auditlog.model");
+const {
+    validateTeachingSection,
+} = require("../../services/section/sectionAssignment.service");
 
 const assignFacultyToSubject = async (req, res) => {
     try {
 
         const { subjectId } = req.params;
-        const { facultyIds } = req.body;
+        const { academicYearId, facultyIds, sectionId } = req.body;
 
         // Authorization
         const allowedRoles = [
@@ -42,6 +45,12 @@ const assignFacultyToSubject = async (req, res) => {
                 message: "Subject not found"
             });
         }
+
+        await validateTeachingSection({
+            academicYearId,
+            sectionId,
+            subject
+        });
 
         const faculties =
             await userModel.find({
@@ -117,13 +126,33 @@ const assignFacultyToSubject = async (req, res) => {
                     );
                 }
 
+                if (academicYearId && sectionId) {
+                    const alreadyTeaching = faculty.teachingAssignments?.some(
+                        item =>
+                            item.subjectId?.toString() === subject._id.toString() &&
+                            item.academicYearId?.toString() === academicYearId.toString() &&
+                            item.sectionId?.toString() === sectionId.toString()
+                    );
+
+                    if (!alreadyTeaching) {
+                        faculty.teachingAssignments = faculty.teachingAssignments || [];
+                        faculty.teachingAssignments.push({
+                            academicYearId,
+                            sectionId,
+                            subjectId: subject._id,
+                            assignedBy: req.user._id,
+                            status: "active",
+                        });
+                    }
+                }
+
                 await faculty.save();
             }
         }
 
         await auditLogModel.create({
             performedBy: req.user._id,
-            action: "UPDATE",
+            action: academicYearId && sectionId ? "SECTION_ASSIGNED" : "UPDATE",
             module: "Subject",
             targetId: subject._id,
             targetName: subject.name,
@@ -142,8 +171,8 @@ const assignFacultyToSubject = async (req, res) => {
 
         console.error(err);
 
-        return res.status(500).json({
-            message: "Internal Server Error"
+        return res.status(err.statusCode || 500).json({
+            message: err.statusCode ? err.message : "Internal Server Error"
         });
     }
 };

@@ -20,6 +20,8 @@ const getUsers = async (req, res) => {
             specialization,
             specializationId,
             semesterId,
+            academicYearId,
+            sectionId,
             status,
         } = req.query;
 
@@ -56,6 +58,18 @@ const getUsers = async (req, res) => {
             filter[
                 "academicAssignments.semesterId"
             ] = normalizeObjectIdFilter(semesterId);
+        }
+
+        if (academicYearId) {
+            filter[
+                "academicAssignments.academicYearId"
+            ] = normalizeObjectIdFilter(academicYearId);
+        }
+
+        if (sectionId) {
+            filter[
+                "academicAssignments.sectionId"
+            ] = normalizeObjectIdFilter(sectionId);
         }
 
         Object.assign(filter, buildSearchFilter(req.query.search, [
@@ -98,6 +112,14 @@ const getUsers = async (req, res) => {
             .populate(
                 "academicAssignments.semesterId",
                 "semesterNumber"
+            )
+            .populate(
+                "academicAssignments.academicYearId",
+                "name startDate endDate isCurrent"
+            )
+            .populate(
+                "academicAssignments.sectionId",
+                "name capacity status"
             )
             .populate(
                 "createdBy",

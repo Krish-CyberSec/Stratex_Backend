@@ -48,6 +48,18 @@
         required: true,
       },
 
+      academicYearId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "AcademicYear",
+        default: null,
+      },
+
+      sectionId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Section",
+        default: null,
+      },
+
       /**
        * Used ONLY for Faculty / Coordinator
        * Students should always have an empty array.
@@ -95,6 +107,41 @@
         default: Date.now,
       },
 
+      assignedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        default: null,
+      },
+    },
+    { _id: false }
+  );
+
+  const teachingAssignmentSchema = new mongoose.Schema(
+    {
+      academicYearId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "AcademicYear",
+        default: null,
+      },
+      sectionId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Section",
+        default: null,
+      },
+      subjectId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Subject",
+        required: true,
+      },
+      status: {
+        type: String,
+        enum: ["active", "inactive"],
+        default: "active",
+      },
+      assignedAt: {
+        type: Date,
+        default: Date.now,
+      },
       assignedBy: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
@@ -181,6 +228,11 @@
         type: mongoose.Schema.Types.ObjectId,
         ref: "Semester",
         default: null,
+      },
+
+      teachingAssignments: {
+        type: [teachingAssignmentSchema],
+        default: [],
       },
 
       /* =====================================================
@@ -337,6 +389,14 @@
   });
 
   userSchema.index({
+    "academicAssignments.academicYearId": 1,
+  });
+
+  userSchema.index({
+    "academicAssignments.sectionId": 1,
+  });
+
+  userSchema.index({
     "academicAssignments.assignedSubjects": 1,
   });
 
@@ -356,6 +416,17 @@
     "academicAssignments.programId": 1,
     "academicAssignments.specializationId": 1,
     "academicAssignments.semesterId": 1,
+  });
+
+  userSchema.index({
+    "academicAssignments.academicYearId": 1,
+    "academicAssignments.sectionId": 1,
+  });
+
+  userSchema.index({
+    "teachingAssignments.academicYearId": 1,
+    "teachingAssignments.sectionId": 1,
+    "teachingAssignments.subjectId": 1,
   });
 
   userSchema.index({

@@ -1,5 +1,6 @@
 const subjectModel = require("../../../models/subject.model");
 const semesterModel = require("../../../models/semester.model");
+const sectionModel = require("../../../models/section.model");
 const { sendError, sendSuccess } = require("../../../utils/apiResponse");
 const {
     buildPagination,
@@ -26,6 +27,8 @@ const getSubjects = async (req, res) => {
             specializationId,
             semester,
             semesterId,
+            academicYearId,
+            sectionId,
             facultyId,
             coordinatorId,
             status,
@@ -89,6 +92,37 @@ const getSubjects = async (req, res) => {
             filter.semesterId = normalizeObjectIdFilter(semester || semesterId);
         }
 
+        if ((academicYearId || sectionId) && !isStudent) {
+            const sectionFilter = {
+                ...(academicYearId ? { academicYearId: normalizeObjectIdFilter(academicYearId) } : {}),
+                ...(sectionId ? { _id: normalizeObjectIdFilter(sectionId) } : {}),
+            };
+            const sections = await sectionModel
+                .find(sectionFilter)
+                .select("programId semesterId specializationId")
+                .lean();
+            const scopeKeys = new Set();
+            const sectionSubjectScopes = sections
+                .map((section) => ({
+                    programId: section.programId,
+                    semesterId: section.semesterId,
+                    specializationId: section.specializationId || null,
+                }))
+                .filter((scope) => {
+                    const key = `${scope.programId}:${scope.semesterId}:${scope.specializationId || ""}`;
+                    if (scopeKeys.has(key)) return false;
+                    scopeKeys.add(key);
+                    return true;
+                });
+
+            filter.$and = filter.$and || [];
+            filter.$and.push(
+                sectionSubjectScopes.length
+                    ? { $or: sectionSubjectScopes }
+                    : { _id: { $in: [] } }
+            );
+        }
+
         if (facultyId) {
             filter.facultyIds = normalizeObjectIdFilter(facultyId);
         }
@@ -109,10 +143,13 @@ const getSubjects = async (req, res) => {
 
         if (filter.$or && searchFilter.$or) {
             filter.$and = [
+                ...(filter.$and || []),
                 { $or: filter.$or },
                 searchFilter
             ];
             delete filter.$or;
+        } else if (searchFilter.$or && filter.$and) {
+            filter.$and.push(searchFilter);
         } else {
             Object.assign(filter, searchFilter);
         }

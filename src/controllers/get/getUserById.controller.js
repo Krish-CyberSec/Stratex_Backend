@@ -27,7 +27,27 @@ const getUserById = async (req, res) => {
                 "semesterNumber name"
             )
             .populate(
+                "academicAssignments.academicYearId",
+                "name startDate endDate isCurrent"
+            )
+            .populate(
+                "academicAssignments.sectionId",
+                "name capacity status"
+            )
+            .populate(
                 "academicAssignments.assignedSubjects",
+                "code name"
+            )
+            .populate(
+                "teachingAssignments.academicYearId",
+                "name startDate endDate isCurrent"
+            )
+            .populate(
+                "teachingAssignments.sectionId",
+                "name capacity status"
+            )
+            .populate(
+                "teachingAssignments.subjectId",
                 "code name"
             )
             .populate(

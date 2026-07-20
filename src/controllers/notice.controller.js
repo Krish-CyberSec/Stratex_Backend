@@ -99,6 +99,8 @@ const buildReceivedNoticeFilter = (user = {}) => {
     user.currentSemester,
     ...assignments.map((assignment) => assignment.semesterId),
   ]);
+  const academicYearIds = toIdStrings(assignments.map((assignment) => assignment.academicYearId));
+  const sectionIds = toIdStrings(assignments.map((assignment) => assignment.sectionId));
 
   const emptyAudienceField = (field) => ({
     $or: [
@@ -146,6 +148,8 @@ const buildReceivedNoticeFilter = (user = {}) => {
               criterionAllows("audienceCriteria.programIds", programIds),
               specializationAllows,
               criterionAllows("audienceCriteria.semesterIds", semesterIds),
+              criterionAllows("audienceCriteria.academicYearIds", academicYearIds),
+              criterionAllows("audienceCriteria.sectionIds", sectionIds),
             ],
           },
         ],

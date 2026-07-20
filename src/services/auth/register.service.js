@@ -179,6 +179,20 @@ const registerUsers = async (req) => {
             ipAddress: req.ip,
             userAgent: req.headers["user-agent"],
           },
+          ...users.flatMap((user, index) =>
+            (usersToCreate[index].academicAssignments || [])
+              .filter((assignment) => assignment.sectionId)
+              .map((assignment) => ({
+                performedBy: req.user._id,
+                action: "SECTION_ASSIGNED",
+                module: "User",
+                targetId: user._id,
+                targetName: `${user.firstName} ${user.lastName}`,
+                remarks: `User assigned to section ${assignment.sectionId}`,
+                ipAddress: req.ip,
+                userAgent: req.headers["user-agent"],
+              }))
+          ),
         ],
         { session }
       );

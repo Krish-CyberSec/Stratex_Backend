@@ -41,6 +41,14 @@ const buildAudienceQuery = (audience) => {
     assignmentMatch.semesterId = { $in: audience.semesterIds };
   }
 
+  if (hasValues(audience.academicYearIds)) {
+    assignmentMatch.academicYearId = { $in: audience.academicYearIds };
+  }
+
+  if (hasValues(audience.sectionIds)) {
+    assignmentMatch.sectionId = { $in: audience.sectionIds };
+  }
+
   if (Object.keys(assignmentMatch).length) {
     query.academicAssignments = {
       $elemMatch: assignmentMatch,
@@ -50,7 +58,9 @@ const buildAudienceQuery = (audience) => {
   if (
     hasValues(audience.semesterIds) &&
     !hasValues(audience.programIds) &&
-    !hasValues(audience.specializationIds)
+    !hasValues(audience.specializationIds) &&
+    !hasValues(audience.academicYearIds) &&
+    !hasValues(audience.sectionIds)
   ) {
     delete query.academicAssignments;
     query.$and = query.$and || [];

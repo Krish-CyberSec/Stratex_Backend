@@ -4,6 +4,8 @@ const programModel = require("../../models/program.model");
 const specializationModel = require("../../models/specelization.model");
 const semesterModel = require("../../models/semester.model");
 const subjectModel = require("../../models/subject.model");
+const academicYearModel = require("../../models/academicYear.model");
+const sectionModel = require("../../models/section.model");
 const { roleRequiresAcademicAssignments } = require("./validateRole.service");
 
 const toId = (value) => value?.toString();
@@ -59,6 +61,42 @@ const assertSubjectOwnership = (subject, assignment) => {
   }
 };
 
+const assertSectionOwnership = (section, assignment) => {
+  if (toId(section.programId) !== toId(assignment.programId)) {
+    const error = new Error("Section does not belong to selected program");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (toId(section.semesterId) !== toId(assignment.semesterId)) {
+    const error = new Error("Section does not belong to selected semester");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (toId(section.academicYearId) !== toId(assignment.academicYearId)) {
+    const error = new Error("Section does not belong to selected academic year");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (assignment.specializationId) {
+    if (toId(section.specializationId) !== toId(assignment.specializationId)) {
+      const error = new Error("Section does not belong to selected specialization");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    return;
+  }
+
+  if (section.specializationId) {
+    const error = new Error("Core students must be assigned to a core section");
+    error.statusCode = 400;
+    throw error;
+  }
+};
+
 const validateAcademicAssignments = async ({ userData, roles }) => {
   const academicAssignments = Array.isArray(userData.academicAssignments)
     ? userData.academicAssignments
@@ -95,7 +133,7 @@ const validateAcademicAssignments = async ({ userData, roles }) => {
 
   const assignmentKeys = academicAssignments.map(
     (assignment) =>
-      `${toId(assignment.programId)}-${toId(assignment.specializationId) || ""}-${toId(assignment.semesterId)}`
+      `${toId(assignment.programId)}-${toId(assignment.specializationId) || ""}-${toId(assignment.semesterId)}-${toId(assignment.academicYearId) || ""}-${toId(assignment.sectionId) || ""}`
   );
 
   if (new Set(assignmentKeys).size !== assignmentKeys.length) {
@@ -112,6 +150,8 @@ const validateAcademicAssignments = async ({ userData, roles }) => {
     academicAssignments.map((assignment) => assignment.specializationId)
   );
   const semesterIds = unique(academicAssignments.map((assignment) => assignment.semesterId));
+  const academicYearIds = unique(academicAssignments.map((assignment) => assignment.academicYearId));
+  const sectionIds = unique(academicAssignments.map((assignment) => assignment.sectionId));
   const subjectIds = unique(
     academicAssignments.flatMap((assignment) => assignment.assignedSubjects || [])
   );
@@ -119,15 +159,21 @@ const validateAcademicAssignments = async ({ userData, roles }) => {
   programIds.forEach((id) => assertObjectId(id, "Program ID"));
   specializationIds.forEach((id) => assertObjectId(id, "Specialization ID"));
   semesterIds.forEach((id) => assertObjectId(id, "Semester ID"));
+  academicYearIds.forEach((id) => assertObjectId(id, "Academic Year ID"));
+  sectionIds.forEach((id) => assertObjectId(id, "Section ID"));
   subjectIds.forEach((id) => assertObjectId(id, "Subject ID"));
 
-  const [school, programs, specializations, semesters, subjects] = await Promise.all([
+  const [school, programs, specializations, semesters, academicYears, sections, subjects] = await Promise.all([
     schoolModel.findById(schoolId).lean(),
     programModel.find({ _id: { $in: programIds } }).lean(),
     specializationIds.length
       ? specializationModel.find({ _id: { $in: specializationIds } }).lean()
       : [],
     semesterModel.find({ _id: { $in: semesterIds } }).lean(),
+    academicYearIds.length
+      ? academicYearModel.find({ _id: { $in: academicYearIds } }).lean()
+      : [],
+    sectionIds.length ? sectionModel.find({ _id: { $in: sectionIds } }).lean() : [],
     subjectIds.length ? subjectModel.find({ _id: { $in: subjectIds } }).lean() : [],
   ]);
 
@@ -140,6 +186,8 @@ const validateAcademicAssignments = async ({ userData, roles }) => {
   const programMap = buildMap(programs);
   const specializationMap = buildMap(specializations);
   const semesterMap = buildMap(semesters);
+  const academicYearMap = buildMap(academicYears);
+  const sectionMap = buildMap(sections);
   const subjectMap = buildMap(subjects);
 
   const normalizedAssignments = academicAssignments.map((assignment) => {
@@ -192,6 +240,38 @@ const validateAcademicAssignments = async ({ userData, roles }) => {
 
     assertSemesterOwnership(semester, assignment);
 
+    if (assignment.academicYearId) {
+      const academicYear = academicYearMap.get(toId(assignment.academicYearId));
+      if (!academicYear) {
+        const error = new Error("Academic year not found");
+        error.statusCode = 404;
+        throw error;
+      }
+
+      if (toId(academicYear.schoolId) !== toId(schoolId)) {
+        const error = new Error("Academic year does not belong to selected school");
+        error.statusCode = 400;
+        throw error;
+      }
+    }
+
+    if (assignment.sectionId) {
+      if (!assignment.academicYearId) {
+        const error = new Error("Academic year is required when section is assigned");
+        error.statusCode = 400;
+        throw error;
+      }
+
+      const section = sectionMap.get(toId(assignment.sectionId));
+      if (!section) {
+        const error = new Error("Section not found");
+        error.statusCode = 404;
+        throw error;
+      }
+
+      assertSectionOwnership(section, assignment);
+    }
+
     const assignedSubjects = roles.includes("student")
       ? []
       : unique(assignment.assignedSubjects || []);
@@ -210,6 +290,8 @@ const validateAcademicAssignments = async ({ userData, roles }) => {
     return {
       ...assignment,
       specializationId: assignment.specializationId || null,
+      academicYearId: assignment.academicYearId || null,
+      sectionId: assignment.sectionId || null,
       assignedSubjects,
       isCoordinator: roles.includes("coordinator") || Boolean(assignment.isCoordinator),
       isPrimary: Boolean(assignment.isPrimary),

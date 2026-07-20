@@ -59,6 +59,20 @@ const AudienceCriteriaSchema = new mongoose.Schema(
       },
     ],
 
+    academicYearIds: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "AcademicYear",
+      },
+    ],
+
+    sectionIds: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "Section",
+      },
+    ],
+
     includeUsersWithoutSpecialization: {
       type: Boolean,
       default: false,
@@ -154,6 +168,8 @@ const NotificationSchema = new mongoose.Schema(
           "Program",
           "Specialization",
           "Semester",
+          "AcademicYear",
+          "Section",
           "Subject",
           "Notice",
           "Event",
@@ -266,6 +282,14 @@ NotificationSchema.index({
 
 NotificationSchema.index({
   "audience.semesterIds": 1,
+});
+
+NotificationSchema.index({
+  "audience.academicYearIds": 1,
+});
+
+NotificationSchema.index({
+  "audience.sectionIds": 1,
 });
 
 NotificationSchema.index({

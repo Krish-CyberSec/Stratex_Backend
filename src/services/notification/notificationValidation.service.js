@@ -31,6 +31,8 @@ const VALID_REFERENCE_MODELS = [
   "Program",
   "Specialization",
   "Semester",
+  "AcademicYear",
+  "Section",
   "Subject",
   "Notice",
   "Event",
@@ -45,6 +47,8 @@ const objectIdAudienceFields = [
   "programIds",
   "specializationIds",
   "semesterIds",
+  "academicYearIds",
+  "sectionIds",
   "excludeUserIds",
 ];
 
@@ -110,7 +114,9 @@ const validateAudience = (audience) => {
     normalized.schoolIds.length ||
     normalized.programIds.length ||
     normalized.specializationIds.length ||
-    normalized.semesterIds.length;
+    normalized.semesterIds.length ||
+    normalized.academicYearIds.length ||
+    normalized.sectionIds.length;
 
   if (!hasAudience) {
     errors.push("Audience must target at least one user group");

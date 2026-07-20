@@ -3,6 +3,8 @@ const eventModel = require("../models/event.model");
 const noticeModel = require("../models/notice.model");
 const programModel = require("../models/program.model");
 const schoolModel = require("../models/school.model");
+const academicYearModel = require("../models/academicYear.model");
+const sectionModel = require("../models/section.model");
 const subjectModel = require("../models/subject.model");
 const userModel = require("../models/user.model");
 
@@ -38,6 +40,8 @@ const buildStudentNoticeFilter = (user = {}) => {
     user.currentSemester,
     ...assignments.map((assignment) => assignment.semesterId)
   ]);
+  const academicYearIds = toIdStrings(assignments.map((assignment) => assignment.academicYearId));
+  const sectionIds = toIdStrings(assignments.map((assignment) => assignment.sectionId));
   const specializationAllows = specializationIds.length
     ? criterionAllows("audienceCriteria.specializationIds", specializationIds)
     : {
@@ -66,7 +70,9 @@ const buildStudentNoticeFilter = (user = {}) => {
                   criterionAllows("audienceCriteria.schoolIds", schoolId ? [schoolId] : []),
                   criterionAllows("audienceCriteria.programIds", programIds),
                   specializationAllows,
-                  criterionAllows("audienceCriteria.semesterIds", semesterIds)
+                  criterionAllows("audienceCriteria.semesterIds", semesterIds),
+                  criterionAllows("audienceCriteria.academicYearIds", academicYearIds),
+                  criterionAllows("audienceCriteria.sectionIds", sectionIds)
                 ]
               }
             ]
@@ -120,7 +126,9 @@ const getStudentDashboard = async (req, res) => {
       .populate("currentSemester", "semesterNumber status")
       .populate("academicAssignments.programId", "name code degreeType duration")
       .populate("academicAssignments.specializationId", "name code")
-      .populate("academicAssignments.semesterId", "semesterNumber status");
+      .populate("academicAssignments.semesterId", "semesterNumber status")
+      .populate("academicAssignments.academicYearId", "name startDate endDate isCurrent")
+      .populate("academicAssignments.sectionId", "name capacity status");
 
     if (!user) {
       return res.status(404).json({ message: "Student not found" });
@@ -191,6 +199,8 @@ const getStudentDashboard = async (req, res) => {
         program: assignment.programId || null,
         specialization: assignment.specializationId || null,
         semester: assignment.semesterId || user.currentSemester || null,
+        academicYear: assignment.academicYearId || null,
+        section: assignment.sectionId || null,
         semesterLabel: getSemesterLabel(semesterNumber),
         termLabel: getTermLabel(semesterNumber),
         institutionId: user.universityAccount?.institutionId || null
@@ -222,14 +232,34 @@ const getStats = async (_req, res) => {
       totalPrograms,
       totalSubjects,
       totalNotices,
-      totalEvents
+      totalEvents,
+      academicYearCount,
+      sectionCount,
+      currentAcademicYears,
+      studentsPerAcademicYear,
+      studentsPerSection
     ] = await Promise.all([
       userModel.countDocuments(),
       schoolModel.countDocuments(),
       programModel.countDocuments(),
       subjectModel.countDocuments(),
       noticeModel.countDocuments(),
-      eventModel.countDocuments()
+      eventModel.countDocuments(),
+      academicYearModel.countDocuments(),
+      sectionModel.countDocuments(),
+      academicYearModel.find({ isCurrent: true }).populate("schoolId", "name slug").lean(),
+      userModel.aggregate([
+        { $match: { roles: "student", "academicAssignments.academicYearId": { $ne: null } } },
+        { $unwind: "$academicAssignments" },
+        { $match: { "academicAssignments.academicYearId": { $ne: null } } },
+        { $group: { _id: "$academicAssignments.academicYearId", students: { $sum: 1 } } }
+      ]),
+      userModel.aggregate([
+        { $match: { roles: "student", "academicAssignments.sectionId": { $ne: null } } },
+        { $unwind: "$academicAssignments" },
+        { $match: { "academicAssignments.sectionId": { $ne: null } } },
+        { $group: { _id: "$academicAssignments.sectionId", students: { $sum: 1 } } }
+      ])
     ]);
 
     return res.status(200).json({
@@ -238,7 +268,12 @@ const getStats = async (_req, res) => {
       totalPrograms,
       totalSubjects,
       totalNotices,
-      totalEvents
+      totalEvents,
+      academicYearCount,
+      sectionCount,
+      currentAcademicYears,
+      studentsPerAcademicYear,
+      studentsPerSection
     });
   } catch (err) {
     console.error(err);

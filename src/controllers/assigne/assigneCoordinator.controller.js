@@ -1,12 +1,15 @@
 const subjectModel = require("../../models/subject.model");
 const userModel = require("../../models/user.model");
 const auditLogModel = require("../../models/auditlog.model");
+const {
+    validateTeachingSection,
+} = require("../../services/section/sectionAssignment.service");
 
 const assignCoordinatorToSubject = async (req, res) => {
     try {
 
         const { subjectId } = req.params;
-        const { coordinatorId } = req.body;
+        const { academicYearId, coordinatorId, sectionId } = req.body;
 
         // Authorization
         const allowedRoles = [
@@ -48,6 +51,12 @@ const assignCoordinatorToSubject = async (req, res) => {
                 message: "Subject not found"
             });
         }
+
+        await validateTeachingSection({
+            academicYearId,
+            sectionId,
+            subject
+        });
 
         // Coordinator Validation
         const coordinator =
@@ -121,9 +130,30 @@ const assignCoordinatorToSubject = async (req, res) => {
 
         await subject.save();
 
+        if (academicYearId && sectionId) {
+            const alreadyTeaching = coordinator.teachingAssignments?.some(
+                item =>
+                    item.subjectId?.toString() === subject._id.toString() &&
+                    item.academicYearId?.toString() === academicYearId.toString() &&
+                    item.sectionId?.toString() === sectionId.toString()
+            );
+
+            if (!alreadyTeaching) {
+                coordinator.teachingAssignments = coordinator.teachingAssignments || [];
+                coordinator.teachingAssignments.push({
+                    academicYearId,
+                    sectionId,
+                    subjectId: subject._id,
+                    assignedBy: req.user._id,
+                    status: "active",
+                });
+                await coordinator.save();
+            }
+        }
+
         await auditLogModel.create({
             performedBy: req.user._id,
-            action: "UPDATE",
+            action: academicYearId && sectionId ? "SECTION_ASSIGNED" : "UPDATE",
             module: "Subject",
             targetId: subject._id,
             targetName: subject.name,
@@ -158,8 +188,8 @@ const assignCoordinatorToSubject = async (req, res) => {
             console.error(auditErr);
         }
 
-        return res.status(500).json({
-            message: "Internal Server Error"
+        return res.status(err.statusCode || 500).json({
+            message: err.statusCode ? err.message : "Internal Server Error"
         });
     }
 };
