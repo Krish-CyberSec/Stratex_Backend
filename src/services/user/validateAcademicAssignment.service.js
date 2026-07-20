@@ -23,6 +23,18 @@ const unique = (values) => [...new Set(values.filter(Boolean).map(String))];
 const buildMap = (docs) =>
   new Map(docs.map((doc) => [doc._id.toString(), doc]));
 
+const hydrateAssignmentFromSection = (assignment, section) => {
+  if (!section) return assignment;
+
+  return {
+    ...assignment,
+    academicYearId: assignment.academicYearId || section.academicYearId,
+    programId: assignment.programId || section.programId,
+    semesterId: assignment.semesterId || section.semesterId,
+    specializationId: assignment.specializationId || section.specializationId || null,
+  };
+};
+
 const assertSemesterOwnership = (semester, assignment) => {
   if (toId(semester.programId) !== toId(assignment.programId)) {
     const error = new Error("Semester does not belong to selected program");
@@ -131,7 +143,41 @@ const validateAcademicAssignments = async ({ userData, roles }) => {
     throw error;
   }
 
-  const assignmentKeys = academicAssignments.map(
+  const schoolId = userData.schoolId;
+  assertObjectId(schoolId, "School ID");
+
+  const sectionIds = unique(academicAssignments.map((assignment) => assignment.sectionId));
+  sectionIds.forEach((id) => assertObjectId(id, "Section ID"));
+
+  const [school, sections] = await Promise.all([
+    schoolModel.findById(schoolId).lean(),
+    sectionIds.length ? sectionModel.find({ _id: { $in: sectionIds } }).lean() : [],
+  ]);
+
+  if (!school) {
+    const error = new Error("School not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const sectionMap = buildMap(sections);
+
+  sectionIds.forEach((sectionId) => {
+    if (!sectionMap.has(sectionId)) {
+      const error = new Error("Section not found");
+      error.statusCode = 404;
+      throw error;
+    }
+  });
+
+  const enrichedAssignments = academicAssignments.map((assignment) =>
+    hydrateAssignmentFromSection(
+      assignment,
+      assignment.sectionId ? sectionMap.get(toId(assignment.sectionId)) : null
+    )
+  );
+
+  const assignmentKeys = enrichedAssignments.map(
     (assignment) =>
       `${toId(assignment.programId)}-${toId(assignment.specializationId) || ""}-${toId(assignment.semesterId)}-${toId(assignment.academicYearId) || ""}-${toId(assignment.sectionId) || ""}`
   );
@@ -142,29 +188,23 @@ const validateAcademicAssignments = async ({ userData, roles }) => {
     throw error;
   }
 
-  const schoolId = userData.schoolId;
-  assertObjectId(schoolId, "School ID");
-
-  const programIds = unique(academicAssignments.map((assignment) => assignment.programId));
+  const programIds = unique(enrichedAssignments.map((assignment) => assignment.programId));
   const specializationIds = unique(
-    academicAssignments.map((assignment) => assignment.specializationId)
+    enrichedAssignments.map((assignment) => assignment.specializationId)
   );
-  const semesterIds = unique(academicAssignments.map((assignment) => assignment.semesterId));
-  const academicYearIds = unique(academicAssignments.map((assignment) => assignment.academicYearId));
-  const sectionIds = unique(academicAssignments.map((assignment) => assignment.sectionId));
+  const semesterIds = unique(enrichedAssignments.map((assignment) => assignment.semesterId));
+  const academicYearIds = unique(enrichedAssignments.map((assignment) => assignment.academicYearId));
   const subjectIds = unique(
-    academicAssignments.flatMap((assignment) => assignment.assignedSubjects || [])
+    enrichedAssignments.flatMap((assignment) => assignment.assignedSubjects || [])
   );
 
   programIds.forEach((id) => assertObjectId(id, "Program ID"));
   specializationIds.forEach((id) => assertObjectId(id, "Specialization ID"));
   semesterIds.forEach((id) => assertObjectId(id, "Semester ID"));
   academicYearIds.forEach((id) => assertObjectId(id, "Academic Year ID"));
-  sectionIds.forEach((id) => assertObjectId(id, "Section ID"));
   subjectIds.forEach((id) => assertObjectId(id, "Subject ID"));
 
-  const [school, programs, specializations, semesters, academicYears, sections, subjects] = await Promise.all([
-    schoolModel.findById(schoolId).lean(),
+  const [programs, specializations, semesters, academicYears, subjects] = await Promise.all([
     programModel.find({ _id: { $in: programIds } }).lean(),
     specializationIds.length
       ? specializationModel.find({ _id: { $in: specializationIds } }).lean()
@@ -173,24 +213,16 @@ const validateAcademicAssignments = async ({ userData, roles }) => {
     academicYearIds.length
       ? academicYearModel.find({ _id: { $in: academicYearIds } }).lean()
       : [],
-    sectionIds.length ? sectionModel.find({ _id: { $in: sectionIds } }).lean() : [],
     subjectIds.length ? subjectModel.find({ _id: { $in: subjectIds } }).lean() : [],
   ]);
-
-  if (!school) {
-    const error = new Error("School not found");
-    error.statusCode = 404;
-    throw error;
-  }
 
   const programMap = buildMap(programs);
   const specializationMap = buildMap(specializations);
   const semesterMap = buildMap(semesters);
   const academicYearMap = buildMap(academicYears);
-  const sectionMap = buildMap(sections);
   const subjectMap = buildMap(subjects);
 
-  const normalizedAssignments = academicAssignments.map((assignment) => {
+  const normalizedAssignments = enrichedAssignments.map((assignment) => {
     if (!assignment.programId) {
       const error = new Error("Program ID is required");
       error.statusCode = 400;
@@ -256,12 +288,6 @@ const validateAcademicAssignments = async ({ userData, roles }) => {
     }
 
     if (assignment.sectionId) {
-      if (!assignment.academicYearId) {
-        const error = new Error("Academic year is required when section is assigned");
-        error.statusCode = 400;
-        throw error;
-      }
-
       const section = sectionMap.get(toId(assignment.sectionId));
       if (!section) {
         const error = new Error("Section not found");
