@@ -208,8 +208,8 @@ const logout = async (req, res) => {
 
     res.clearCookie("access_token", {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
+        secure: true,
+        sameSite: "none",
     });
 
     try {
